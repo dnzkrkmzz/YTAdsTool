@@ -1,0 +1,139 @@
+@using YTReklamAraci.Models
+@model List<CommentHunterResult>
+@{
+    ViewData["Title"] = "Yorumlarda Kelime Avcısı";
+}
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">🎯 Yorumlarda Kelime Avcısı</h2>
+    
+    <div class="card p-4 shadow-sm mb-5">
+        <form asp-action="CommentHunter" method="post">
+            <div class="row">
+                <div class="col-md-5">
+                    <label class="form-label text-muted fw-bold">1. Hangi konularda video aransın?</label>
+                    <input type="text" name="mainKeywords" class="form-control" placeholder="Örn: laptop, oyuncu bilgisayarı (Max 10)" required>
+                    <small class="text-secondary" style="font-size: 0.8rem;">Kelimeleri <b>virgülle</b> ayırın.</small>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label text-muted fw-bold">2. Yorumlarda ne geçmeli?</label>
+                    <input type="text" name="commentKeywords" class="form-control" placeholder="Örn: ısınıyor, kasıyor (Max 10)" required>
+                    <small class="text-secondary" style="font-size: 0.8rem;">Herhangi biri geçen yorumlar yakalanır.</small>
+                </div>
+                <div class="col-md-2 d-flex align-items-center mt-3 mt-md-0">
+                    <button type="submit" class="btn btn-danger w-100 py-2">Avı Başlat!</button>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <a class="text-decoration-none text-primary fw-bold" data-bs-toggle="collapse" href="#advancedFilters" role="button" aria-expanded="false" aria-controls="advancedFilters">
+                    <small>Gelişmiş Filtreler ↓</small>
+                </a>
+                <div class="collapse mt-2" id="advancedFilters">
+                    <div class="card card-body bg-light border-0">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted" style="font-size: 0.85rem;">Yüklenme Tarihi</label>
+                                <select name="dateFilter" class="form-select form-select-sm">
+                                    <option value="any">Farketmez</option>
+                                    <option value="today">Bugün</option>
+                                    <option value="week">Bu Hafta</option>
+                                    <option value="month">Bu Ay</option>
+                                    <option value="year">Bu Yıl</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted" style="font-size: 0.85rem;">Video Süresi</label>
+                                <select name="durationFilter" class="form-select form-select-sm">
+                                    <option value="any">Farketmez</option>
+                                    <option value="short">Kısa (< 4 dk)</option>
+                                    <option value="medium">Orta (4-20 dk)</option>
+                                    <option value="long">Uzun (> 20 dk)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" name="hdOnly" value="true" id="hdOnlyCheck">
+                                    <label class="form-check-label text-muted" style="font-size: 0.85rem;" for="hdOnlyCheck">
+                                        Sadece HD Videolar
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    @if (Model != null)
+    {
+        <div class="alert alert-info mt-4 shadow-sm border-0 d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-2">🎯 Av Sonuçları (@Model.Count Video Bulundu)</h5>
+                <div style="font-size: 0.9rem;">
+                    <strong>Aranan Video Konuları:</strong> @ViewBag.SearchedMainKeywords <br/>
+                    <strong>Hedeflenen Yorum Kelimeleri:</strong> @ViewBag.SearchedCommentKeywords
+                </div>
+            </div>
+            
+            @if(Model.Count > 0)
+            {
+                <form asp-action="ExportCommentHunterToExcel" method="post">
+                    @for (int i = 0; i < Model.Count; i++)
+                    {
+                        <input type="hidden" name="results[@i].VideoId" value="@Model[i].VideoId" />
+                        <input type="hidden" name="results[@i].Title" value="@Model[i].Title" />
+                        <input type="hidden" name="results[@i].ChannelName" value="@Model[i].ChannelName" />
+                        <input type="hidden" name="results[@i].ViewCount" value="@Model[i].ViewCount" />
+                        <input type="hidden" name="results[@i].CommentCount" value="@Model[i].CommentCount" />
+                        <input type="hidden" name="results[@i].SampleComment" value="@Model[i].SampleComment" />
+                    }
+                    <button type="submit" class="btn btn-success fw-bold shadow-sm">
+                        Excel'e Aktar
+                    </button>
+                </form>
+            }
+        </div>
+        <hr />
+        
+        <div class="row">
+            @foreach (var item in Model)
+            {
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <img src="@item.Thumbnail" class="card-img-top">
+                        <div class="card-body">
+                            <h5 class="card-title" style="font-size: 0.9rem;">@item.Title</h5>
+                            <p class="mb-1 text-muted small">👤 @item.ChannelName &nbsp;|&nbsp; 👁️ @item.ViewCount?.ToString("N0") İzlenme</p>
+                            <p class="badge bg-success">@item.CommentCount Eşleşen Yorum</p>
+                            <div class="p-2 bg-light border rounded small" style="max-height: 100px; overflow-y: auto;">
+                                <strong>Örnek Yorum:</strong> <br />
+                                @Html.Raw(item.SampleComment)
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <a href="https://www.youtube.com/watch?v=@item.VideoId" target="_blank" class="btn btn-outline-primary btn-sm w-100">Videoyu Aç</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script>
+    document.querySelector('form[action="/Home/CommentHunter"]').addEventListener('submit', function (e) {
+        var mainKw = document.querySelector('input[name="mainKeywords"]').value;
+        var comKw = document.querySelector('input[name="commentKeywords"]').value;
+        
+        // Virgülleri sayıp kelime sayısını buluyoruz
+        var mainCount = mainKw.split(',').filter(x => x.trim() !== '').length;
+        var comCount = comKw.split(',').filter(x => x.trim() !== '').length;
+
+        if (mainCount > 10 || comCount > 10) {
+            e.preventDefault(); // Formun gönderilmesini durdur
+            alert('Lütfen kutulara en fazla 10 adet kelime girin! (Virgülle ayırarak)');
+        }
+    });
+</script>

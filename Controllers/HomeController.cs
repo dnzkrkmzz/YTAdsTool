@@ -375,4 +375,187 @@ public class HomeController : Controller
 
         return View(model);
     }
+
+    [HttpGet]
+    // GET: Yorum Avcısı Sayfası
+    public IActionResult CommentHunter()
+    {
+        return View();
+    }
+
+// POST: Yorumlarda Arama Yapma
+    [HttpPost]
+    public async Task<IActionResult> CommentHunter(string mainKeywords, string commentKeywords, string dateFilter, string durationFilter, bool hdOnly)
+    {
+        if (string.IsNullOrEmpty(mainKeywords) || string.IsNullOrEmpty(commentKeywords))
+        {
+            ViewBag.Error = "Lütfen her iki alanı da doldurun.";
+            return View();
+        }
+
+        var mainKeywordList = mainKeywords.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).Distinct().Take(10).ToList();
+        string youtubeSearchQuery = string.Join(" | ", mainKeywordList);
+
+        var commentKeywordList = commentKeywords.Split(',').Select(k => k.Trim().ToLower()).Where(k => !string.IsNullOrEmpty(k)).Distinct().Take(10).ToList();
+
+        if (!mainKeywordList.Any() || !commentKeywordList.Any())
+        {
+            ViewBag.Error = "Lütfen geçerli kelimeler girin.";
+            return View();
+        }
+
+        var youtubeService = new YouTubeService(new BaseClientService.Initializer()
+        {
+            ApiKey = _config["YouTubeSettings:ApiKey"], 
+            ApplicationName = "YTReklamAraci"
+        });
+
+        var searchRequest = youtubeService.Search.List("snippet");
+        searchRequest.Q = youtubeSearchQuery;
+        searchRequest.MaxResults = 25; 
+        searchRequest.Type = "video";
+
+        // --- EKLENEN GELİŞMİŞ FİLTRELER BURADA BAŞLIYOR ---
+        if (hdOnly)
+        {
+            searchRequest.VideoDefinition = SearchResource.ListRequest.VideoDefinitionEnum.High;
+        }
+
+        if (!string.IsNullOrEmpty(durationFilter) && durationFilter != "any")
+        {
+            searchRequest.VideoDuration = durationFilter switch
+            {
+                "short" => SearchResource.ListRequest.VideoDurationEnum.Short__,
+                "medium" => SearchResource.ListRequest.VideoDurationEnum.Medium,
+                "long" => SearchResource.ListRequest.VideoDurationEnum.Long__,
+                _ => SearchResource.ListRequest.VideoDurationEnum.Any
+            };
+        }
+
+        if (!string.IsNullOrEmpty(dateFilter) && dateFilter != "any")
+        {
+            DateTimeOffset? publishedAfter = dateFilter switch
+            {
+                "today" => DateTimeOffset.UtcNow.AddDays(-1),
+                "week" => DateTimeOffset.UtcNow.AddDays(-7),
+                "month" => DateTimeOffset.UtcNow.AddMonths(-1),
+                "year" => DateTimeOffset.UtcNow.AddYears(-1),
+                _ => null
+            };
+
+            if (publishedAfter.HasValue)
+            {
+                // Eski olan PublishedAfter yerine yeni olanı kullanıyoruz
+                searchRequest.PublishedAfterDateTimeOffset = publishedAfter; 
+            }
+        }
+        // --------------------------------------------------
+
+        var searchResponse = await searchRequest.ExecuteAsync();
+        var results = new List<CommentHunterResult>();
+
+        foreach (var item in searchResponse.Items)
+        {
+            var commentRequest = youtubeService.CommentThreads.List("snippet");
+            commentRequest.VideoId = item.Id.VideoId;
+            commentRequest.MaxResults = 50; 
+            commentRequest.Order = CommentThreadsResource.ListRequest.OrderEnum.Relevance;
+
+            try
+            {
+                var commentResponse = await commentRequest.ExecuteAsync();
+                int matchCount = 0;
+                string? firstMatchedComment = null;
+
+                foreach (var thread in commentResponse.Items)
+                {
+                    var commentText = thread.Snippet.TopLevelComment.Snippet.TextOriginal.ToLower();
+                    
+                    bool isMatch = commentKeywordList.Any(kw => commentText.Contains(kw));
+
+                    if (isMatch)
+                    {
+                        matchCount++;
+                        if (firstMatchedComment == null) 
+                        {
+                            firstMatchedComment = thread.Snippet.TopLevelComment.Snippet.TextDisplay; 
+                        }
+                    }
+                }
+
+                if (matchCount > 0)
+                {
+                    results.Add(new CommentHunterResult
+                    {
+                        VideoId = item.Id.VideoId,
+                        Title = item.Snippet.Title,
+                        ChannelName = item.Snippet.ChannelTitle, // Kanal adını buradan alıyoruz
+                        Thumbnail = item.Snippet.Thumbnails.Medium.Url,
+                        CommentCount = matchCount,
+                        SampleComment = firstMatchedComment
+                    });
+                }
+            }
+            catch { }
+        }
+
+        if (results.Any())
+        {
+            var videoIds = string.Join(",", results.Select(r => r.VideoId));
+            var statRequest = youtubeService.Videos.List("statistics");
+            statRequest.Id = videoIds;
+            var statResponse = await statRequest.ExecuteAsync();
+
+            foreach (var statItem in statResponse.Items)
+            {
+                var res = results.FirstOrDefault(r => r.VideoId == statItem.Id);
+                if (res != null)
+                {
+                    res.ViewCount = statItem.Statistics.ViewCount;
+                }
+            }
+        }
+
+        ViewBag.SearchedMainKeywords = string.Join(", ", mainKeywordList);
+        ViewBag.SearchedCommentKeywords = string.Join(", ", commentKeywordList);
+        
+        return View(results);
+    }
+
+    [HttpPost]
+    public IActionResult ExportCommentHunterToExcel(List<CommentHunterResult> results)
+    {
+        using (var workbook = new ClosedXML.Excel.XLWorkbook())
+        {
+            var worksheet = workbook.Worksheets.Add("Yorum Avı Sonuçları");
+            worksheet.Cell(1, 1).Value = "Video Başlığı";
+            worksheet.Cell(1, 2).Value = "Video URL";
+            worksheet.Cell(1, 3).Value = "Kanal Adı";
+            worksheet.Cell(1, 4).Value = "İzlenme Sayısı";
+            worksheet.Cell(1, 5).Value = "Eşleşen Yorum Sayısı";
+            worksheet.Cell(1, 6).Value = "Örnek Yorum";
+
+            // Başlık satırını kalın yapalım
+            worksheet.Row(1).Style.Font.Bold = true;
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                worksheet.Cell(i + 2, 1).Value = results[i].Title;
+                worksheet.Cell(i + 2, 2).Value = "https://www.youtube.com/watch?v=" + results[i].VideoId;
+                worksheet.Cell(i + 2, 3).Value = results[i].ChannelName;
+                worksheet.Cell(i + 2, 4).Value = results[i].ViewCount?.ToString() ?? "0";
+                worksheet.Cell(i + 2, 5).Value = results[i].CommentCount;
+                worksheet.Cell(i + 2, 6).Value = results[i].SampleComment;
+            }
+
+            worksheet.Columns().AdjustToContents(); 
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                var content = stream.ToArray();
+                return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "YorumAvcisi_Sonuclari.xlsx");
+            }
+        }
+    }
 }
