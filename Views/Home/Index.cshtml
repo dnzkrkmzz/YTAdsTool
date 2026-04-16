@@ -1,0 +1,148 @@
+﻿@model List<YTReklamAraci.Models.YoutubeVideo>
+
+@{
+    ViewData["Title"] = "YT Ads Tool";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4">YT Ads Tool</h1>
+        <p class="lead">Kelimeye göre hedeflenebilir video ve kanal listesi oluşturun.</p>
+    </div>
+    
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-8">
+            <form asp-action="Search" method="post" class="shadow-sm mb-2">
+                <div class="input-group">
+                    <input type="text" name="keyword" class="form-control form-control-lg" 
+                           placeholder="Anahtar kelime girin... (Örn: Video Hedefleme)" 
+                           value="@(Context.Request.HasFormContentType ? Context.Request.Form["keyword"].ToString() : "")">
+                    <button class="btn btn-danger btn-lg" type="submit">
+                        <i class="bi bi-search"></i> Videoları Getir
+                    </button>
+                </div>
+
+                <div class="text-end mt-2">
+                    <a data-bs-toggle="collapse" href="#collapseFilters" role="button" aria-expanded="false" aria-controls="collapseFilters" class="text-decoration-none text-primary fw-bold small">
+                        <i class="bi bi-sliders"></i> Gelişmiş Filtreler
+                    </a>
+                </div>
+
+                <div class="collapse mt-3" id="collapseFilters">
+                    <div class="card card-body bg-light border-0">
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <label class="form-label small fw-bold text-muted">Yüklenme Tarihi</label>
+                                <select class="form-select form-select-sm" name="dateFilter">
+                                    <option value="all">Farketmez</option>
+                                    <option value="month">Son 1 Ay</option>
+                                    <option value="year">Son 1 Yıl</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label class="form-label small fw-bold text-muted">Video Süresi</label>
+                                <select class="form-select form-select-sm" name="durationFilter">
+                                    <option value="all">Farketmez</option>
+                                    <option value="short">Kısa (< 4 Dakika)</option>
+                                    <option value="long">Uzun (> 20 Dakika)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-2 d-flex align-items-end">
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" name="hdOnly" value="true" id="hdCheck">
+                                    <label class="form-check-label small fw-bold text-muted" for="hdCheck">
+                                        Sadece HD Videolar
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="text-center">
+                <small class="text-muted d-block mb-3">Birden fazla kelimeyi virgül (,) ile ayırarak girebilirsiniz.</small>
+                
+                @if (ViewBag.TopTrends != null)
+                {
+                    var trends = ViewBag.TopTrends as List<string>;
+                    if (trends != null && trends.Any())
+                    {
+                        <div class="d-flex justify-content-center align-items-center flex-wrap">
+                            <span class="text-muted small me-2 mb-1">
+                                <i class="bi bi-graph-up-arrow"></i> Trend Aranan Kelimeler:
+                            </span>
+                            @foreach (var trend in trends)
+                            {
+                                <form asp-action="Search" method="post" class="d-inline">
+                                    <input type="hidden" name="keyword" value="@trend" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill me-1 mb-1" title="@trend">
+                                        @(trend.Length > 35 ? trend.Substring(0, 35) + "..." : trend)
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    }
+                }
+                </div>
+        </div>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Sonuçlar (@Model.Count Video)</h3>
+            
+            @* Excel Formu *@
+            <form asp-action="ExportToExcel" method="post">
+                @for (int i = 0; i < Model.Count; i++)
+                {
+                    <input type="hidden" name="[@i].Title" value="@Model[i].Title" />
+                    <input type="hidden" name="[@i].VideoUrl" value="@Model[i].VideoUrl" />
+                    <input type="hidden" name="[@i].ChannelTitle" value="@Model[i].ChannelTitle" />
+                    <input type="hidden" name="[@i].ViewCount" value="@Model[i].ViewCount" />
+                    <input type="hidden" name="[@i].PublishedAt" value="@Model[i].PublishedAt" />
+                }
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-file-earmark-excel"></i> Excel Olarak İndir
+                </button>
+            </form>
+        </div>
+
+        <div class="card shadow">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Video</th>
+                            <th>Kanal</th>
+                            <th>İzlenme</th>
+                            <th>Tarih</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var video in Model)
+                        {
+                            <tr>
+                                <td><small>@video.Title</small></td>
+                                <td><small>@video.ChannelTitle</small></td>
+                                <td><span class="badge bg-info text-dark">@video.ViewCount?.ToString("N0")</span></td>
+                                <td><small>@video.PublishedAt</small></td>
+                                <td>
+                                    <a href="@video.VideoUrl" target="_blank" class="btn btn-outline-danger btn-sm">Aç</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (Model != null)
+    {
+        <div class="alert alert-info text-center">
+            Arama yapmak için yukarıdaki kutucuğu kullanın.
+        </div>
+    }
+</div>

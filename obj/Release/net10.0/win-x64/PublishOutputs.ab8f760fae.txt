@@ -1,0 +1,11 @@
+E:\YTReklamAraci\yeni_publish\publish_klasoru\web.config
+E:\YTReklamAraci\yeni_publish\appsettings.Development.json
+E:\YTReklamAraci\yeni_publish\appsettings.json
+E:\YTReklamAraci\yeni_publish\publish_klasoru\appsettings.Development.json
+E:\YTReklamAraci\yeni_publish\publish_klasoru\appsettings.json
+E:\YTReklamAraci\yeni_publish\publish_klasoru\YTReklamAraci.deps.json
+E:\YTReklamAraci\yeni_publish\publish_klasoru\YTReklamAraci.runtimeconfig.json
+E:\YTReklamAraci\yeni_publish\publish_klasoru\YTReklamAraci.staticwebassets.endpoints.json
+E:\YTReklamAraci\yeni_publish\YTReklamAraci.pdb
+E:\YTReklamAraci\yeni_publish\ytreklam.db
+E:\YTReklamAraci\yeni_publish\YTReklamAraci.exe

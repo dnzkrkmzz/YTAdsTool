@@ -1,0 +1,9 @@
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.csproj.AssemblyReference.cache
+E:\YTReklamAraci\obj\Debug\net8.0\rpswa.dswa.cache.json
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.GeneratedMSBuildEditorConfig.editorconfig
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.AssemblyInfoInputs.cache
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.AssemblyInfo.cs
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.csproj.CoreCompileInputs.cache
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.MvcApplicationPartsAssemblyInfo.cache
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.RazorAssemblyInfo.cache
+E:\YTReklamAraci\obj\Debug\net8.0\YTReklamAraci.RazorAssemblyInfo.cs

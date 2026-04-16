@@ -1,0 +1,68 @@
+@model YTReklamAraci.Models.TagAnalyzerViewModel
+
+@{
+    ViewData["Title"] = "SEO & Etiket Analizi";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-5"><i class="bi bi-tags text-danger"></i> Video Etiket (Tag) Analizi</h1>
+        <p class="lead">Rakiplerinizin videolarında hangi gizli etiketleri kullandığını anında keşfedin.</p>
+    </div>
+
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-8">
+            <form asp-action="TagAnalyzer" method="post" class="input-group shadow-sm mb-2">
+                <input type="text" name="videoUrl" class="form-control form-control-lg" 
+                       placeholder="YouTube Video Linkini Yapıştırın... (Örn: https://www.youtube.com/watch?v=...)" 
+                       value="@Model.VideoUrl">
+                <button class="btn btn-danger btn-lg" type="submit">
+                    Analiz Et
+                </button>
+            </form>
+            
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-warning mt-3 text-center">@Model.ErrorMessage</div>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.VideoTitle))
+    {
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <img src="@Model.ThumbnailUrl" class="card-img-top" alt="Thumbnail">
+                    <div class="card-body">
+                        <h6 class="card-title">@Model.VideoTitle</h6>
+                        <p class="card-text text-muted small"><i class="bi bi-person-video"></i> @Model.ChannelName</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card shadow h-100">
+                    <div class="card-header bg-dark text-white">
+                        <i class="bi bi-hash"></i> Kullanılan Etiketler (@Model.Tags.Count adet)
+                    </div>
+                    <div class="card-body">
+                        @if (Model.Tags.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var tag in Model.Tags)
+                                {
+                                    <span class="badge bg-secondary fs-6 p-2">@tag</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">Bu videoda herhangi bir etiket (tag) kullanılmamış.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>

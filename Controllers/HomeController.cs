@@ -1,0 +1,378 @@
+using Microsoft.AspNetCore.Mvc;
+using YTReklamAraci.Models;
+using YTReklamAraci.Data;
+using Google.Apis.YouTube.v3;
+using Google.Apis.Services;
+using Newtonsoft.Json;
+using ClosedXML.Excel;
+using System.IO;
+using System.Text.RegularExpressions;
+
+namespace YTReklamAraci.Controllers;
+
+public class HomeController : Controller
+{
+    private readonly IConfiguration _config;
+    private readonly ApplicationDbContext _context;
+
+    public HomeController(IConfiguration config, ApplicationDbContext context)
+    {
+        _config = config;
+        _context = context;
+    }
+
+    public IActionResult Index()
+    {
+        ViewBag.TopTrends = _context.SearchCaches
+                                    .OrderByDescending(x => x.SearchCount)
+                                    .Take(5)
+                                    .Select(x => x.Keyword)
+                                    .ToList();
+
+        return View(new List<YoutubeVideo>());
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Search(string keyword, string dateFilter = "all", string durationFilter = "all", bool hdOnly = false)
+    {
+        if (string.IsNullOrEmpty(keyword)) return View("Index", new List<YoutubeVideo>());
+
+        var keywordList = keyword.Split(',')
+                                 .Select(k => k.ToLower().Trim())
+                                 .Where(k => !string.IsNullOrEmpty(k))
+                                 .Distinct()
+                                 .ToList();
+
+        var allVideos = new List<YoutubeVideo>();
+        var apiKey = _config["YouTubeSettings:ApiKey"];
+        var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
+
+        foreach (var word in keywordList)
+        {
+            // Eğer filtre kullanılmışsa, cache adını değiştiriyoruz ki trendler bozulmasın
+            bool hasFilter = dateFilter != "all" || durationFilter != "all" || hdOnly;
+            string cacheKey = hasFilter ? $"{word}|{dateFilter}|{durationFilter}|{hdOnly}" : word;
+
+            var cachedResult = _context.SearchCaches.FirstOrDefault(s => s.Keyword == cacheKey);
+
+            if (cachedResult != null)
+            {
+                cachedResult.SearchCount++; 
+                if (cachedResult.SearchDate > DateTime.Now.AddDays(-1))
+                {
+                    await _context.SaveChangesAsync();
+                    var cachedVideos = JsonConvert.DeserializeObject<List<YoutubeVideo>>(cachedResult.VideoDataJson);
+                    if (cachedVideos != null) allVideos.AddRange(cachedVideos);
+                    continue; 
+                }
+            }
+
+            var searchRequest = youtubeService.Search.List("snippet");
+            searchRequest.Q = word;
+            searchRequest.Type = "video";
+            searchRequest.MaxResults = 20;
+
+            // YENİ EKLENEN FİLTRE MANTIKLARI
+            if (dateFilter == "month") searchRequest.PublishedAfterDateTimeOffset = DateTimeOffset.UtcNow.AddMonths(-1);
+            else if (dateFilter == "year") searchRequest.PublishedAfterDateTimeOffset = DateTimeOffset.UtcNow.AddYears(-1);
+
+            if (durationFilter == "short") searchRequest.VideoDuration = SearchResource.ListRequest.VideoDurationEnum.Short__; // 4 dakikadan az
+            else if (durationFilter == "long") searchRequest.VideoDuration = SearchResource.ListRequest.VideoDurationEnum.Long__;   // 20 dakikadan uzun
+
+            if (hdOnly) searchRequest.VideoDefinition = SearchResource.ListRequest.VideoDefinitionEnum.High;
+
+            var searchResponse = await searchRequest.ExecuteAsync();
+            var videoIds = searchResponse.Items.Select(i => i.Id.VideoId).ToList();
+
+            if (!videoIds.Any()) continue;
+
+            var videoRequest = youtubeService.Videos.List("snippet,statistics");
+            videoRequest.Id = string.Join(",", videoIds);
+            var videoResponse = await videoRequest.ExecuteAsync();
+
+            var videoList = videoResponse.Items.Select(item => new YoutubeVideo
+            {
+                Title = item.Snippet.Title,
+                VideoUrl = "https://www.youtube.com/watch?v=" + item.Id,
+                ChannelTitle = item.Snippet.ChannelTitle,
+                ChannelUrl = "https://www.youtube.com/channel/" + item.Snippet.ChannelId,
+                ViewCount = item.Statistics.ViewCount,
+                LikeCount = item.Statistics.LikeCount,
+                PublishedAt = item.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? ""
+            }).ToList();
+
+            allVideos.AddRange(videoList);
+
+            if (cachedResult != null)
+            {
+                cachedResult.VideoDataJson = JsonConvert.SerializeObject(videoList);
+                cachedResult.SearchDate = DateTime.Now;
+                _context.SearchCaches.Update(cachedResult);
+            }
+            else
+            {
+                var newCache = new SearchCache
+                {
+                    Keyword = cacheKey,
+                    VideoDataJson = JsonConvert.SerializeObject(videoList),
+                    SearchDate = DateTime.Now,
+                    SearchCount = 1
+                };
+                _context.SearchCaches.Add(newCache);
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        var distinctVideos = allVideos.GroupBy(v => v.VideoUrl).Select(g => g.First()).ToList();
+
+        // Trendlerde sadece "filtresiz" (içinde | işareti olmayan) aramaları gösteriyoruz
+        ViewBag.TopTrends = _context.SearchCaches
+                                    .Where(x => !x.Keyword.Contains("|"))
+                                    .OrderByDescending(x => x.SearchCount)
+                                    .Take(5)
+                                    .Select(x => x.Keyword)
+                                    .ToList();
+
+        return View("Index", distinctVideos);
+    }
+
+    [HttpPost]
+    public IActionResult ExportToExcel(List<YoutubeVideo> videos)
+    {
+        using (var workbook = new XLWorkbook())
+        {
+            var worksheet = workbook.Worksheets.Add("Hedefleme Listesi");
+            worksheet.Cell(1, 1).Value = "Video Başlığı";
+            worksheet.Cell(1, 2).Value = "Video URL";
+            worksheet.Cell(1, 3).Value = "Kanal Adı";
+            worksheet.Cell(1, 4).Value = "İzlenme";
+            worksheet.Cell(1, 5).Value = "Yayın Tarihi";
+
+            for (int i = 0; i < videos.Count; i++)
+            {
+                worksheet.Cell(i + 2, 1).Value = videos[i].Title;
+                worksheet.Cell(i + 2, 2).Value = videos[i].VideoUrl;
+                worksheet.Cell(i + 2, 3).Value = videos[i].ChannelTitle;
+                worksheet.Cell(i + 2, 4).Value = videos[i].ViewCount?.ToString() ?? "0";
+                worksheet.Cell(i + 2, 5).Value = videos[i].PublishedAt;
+            }
+
+            worksheet.Columns().AdjustToContents(); 
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                var content = stream.ToArray();
+                return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "YTtarget.xlsx");
+            }
+        }
+    }
+
+    // --- YENİ ARAÇ: SEO VE ETİKET ANALİZİ ---
+
+    public IActionResult TagAnalyzer()
+    {
+        return View(new TagAnalyzerViewModel());
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> TagAnalyzer(string videoUrl)
+    {
+        var model = new TagAnalyzerViewModel { VideoUrl = videoUrl };
+
+        if (string.IsNullOrEmpty(videoUrl))
+        {
+            model.ErrorMessage = "Lütfen geçerli bir YouTube URL'si girin.";
+            return View(model);
+        }
+
+        // URL'den 11 haneli Video ID'yi çıkaran Regex formülü
+        var match = Regex.Match(videoUrl, @"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})");
+        
+        if (!match.Success)
+        {
+            model.ErrorMessage = "Video linki anlaşılamadı. Lütfen tam linki kopyaladığınızdan emin olun.";
+            return View(model);
+        }
+
+        var videoId = match.Groups[1].Value;
+
+        // API'ye bağlan ve video detaylarını çek
+        var apiKey = _config["YouTubeSettings:ApiKey"];
+        var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
+
+        var videoRequest = youtubeService.Videos.List("snippet");
+        videoRequest.Id = videoId;
+        var videoResponse = await videoRequest.ExecuteAsync();
+
+        var videoItem = videoResponse.Items.FirstOrDefault();
+
+        if (videoItem == null)
+        {
+            model.ErrorMessage = "Video bulunamadı. Gizli veya silinmiş olabilir.";
+            return View(model);
+        }
+
+        // Gelen verileri modele aktar
+        model.VideoTitle = videoItem.Snippet.Title;
+        model.ChannelName = videoItem.Snippet.ChannelTitle;
+        model.ThumbnailUrl = videoItem.Snippet.Thumbnails.High?.Url ?? videoItem.Snippet.Thumbnails.Default__.Url;
+        
+        // Videonun etiketleri varsa listeye at, yoksa boş liste döndür
+        if (videoItem.Snippet.Tags != null)
+        {
+            model.Tags = videoItem.Snippet.Tags.ToList();
+        }
+
+        return View(model);
+    }
+
+    // --- YENİ ARAÇ: DETAYLI KANAL ANALİZİ ---
+
+    public IActionResult ChannelAnalyzer()
+    {
+        return View(new ChannelViewModel());
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ChannelAnalyzer(string channelUrl)
+    {
+        var model = new ChannelViewModel();
+
+        if (string.IsNullOrEmpty(channelUrl))
+        {
+            model.ErrorMessage = "Lütfen bir kanal linki veya ID'si girin.";
+            return View(model);
+        }
+
+        // Kanal ID'sini linkten ayıklama (Basit yöntem)
+        string channelId = "";
+        if (channelUrl.Contains("channel/")) 
+            channelId = channelUrl.Split("channel/")[1].Split('/')[0].Split('?')[0];
+        else if (channelUrl.Contains("@")) // Handle handles
+             channelId = channelUrl; // Handle'lar için özel arama gerekecek, şimdilik direkt ID kabul edelim
+        else 
+            channelId = channelUrl;
+
+        var apiKey = _config["YouTubeSettings:ApiKey"];
+        var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
+
+        // 1. Kanal Bilgilerini Çek
+        var channelRequest = youtubeService.Channels.List("snippet,statistics,brandingSettings");
+        
+        if (channelId.StartsWith("@")) channelRequest.ForHandle = channelId;
+        else channelRequest.Id = channelId;
+
+        var channelResponse = await channelRequest.ExecuteAsync();
+        var channelItem = channelResponse.Items?.FirstOrDefault();
+
+        if (channelItem == null)
+        {
+            model.ErrorMessage = "Kanal bulunamadı. Lütfen ID'yi kontrol edin.";
+            return View(model);
+        }
+
+        model.ChannelId = channelItem.Id;
+        model.Title = channelItem.Snippet.Title;
+        model.Description = channelItem.Snippet.Description;
+        model.ProfileImageUrl = channelItem.Snippet.Thumbnails.High?.Url ?? "";
+        model.BannerImageUrl = channelItem.BrandingSettings.Image?.BannerExternalUrl ?? "";
+        model.SubscriberCount = channelItem.Statistics.SubscriberCount;
+        model.VideoCount = channelItem.Statistics.VideoCount;
+        model.ViewCount = channelItem.Statistics.ViewCount;
+        model.PublishedAt = channelItem.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? "";
+
+        // 2. Kanalın En Popüler 5 Videosunu Çek
+        var searchRequest = youtubeService.Search.List("snippet");
+        searchRequest.ChannelId = channelItem.Id;
+        searchRequest.Order = SearchResource.ListRequest.OrderEnum.ViewCount;
+        searchRequest.Type = "video";
+        searchRequest.MaxResults = 5;
+        var searchResponse = await searchRequest.ExecuteAsync();
+
+        model.TopVideos = searchResponse.Items.Select(v => new YoutubeVideo {
+            Title = v.Snippet.Title,
+            VideoUrl = "https://www.youtube.com/watch?v=" + v.Id.VideoId,
+            PublishedAt = v.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? ""
+        }).ToList();
+
+        return View(model);
+    }
+
+    // --- YENİ ARAÇ: YORUM VE KİTLE ANALİZİ ---
+
+    public IActionResult CommentAnalyzer()
+    {
+        return View(new CommentAnalyzerViewModel());
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CommentAnalyzer(string videoUrl)
+    {
+        var model = new CommentAnalyzerViewModel { VideoUrl = videoUrl };
+
+        if (string.IsNullOrEmpty(videoUrl))
+        {
+            model.ErrorMessage = "Lütfen geçerli bir YouTube URL'si girin.";
+            return View(model);
+        }
+
+        var match = Regex.Match(videoUrl, @"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})");
+        if (!match.Success)
+        {
+            model.ErrorMessage = "Video linki anlaşılamadı. Lütfen tam linki kopyaladığınızdan emin olun.";
+            return View(model);
+        }
+
+        var videoId = match.Groups[1].Value;
+        var apiKey = _config["YouTubeSettings:ApiKey"];
+        var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
+
+        try
+        {
+            // 1. Önce Video Detaylarını Çek
+            var videoRequest = youtubeService.Videos.List("snippet,statistics");
+            videoRequest.Id = videoId;
+            var videoResponse = await videoRequest.ExecuteAsync();
+            var videoItem = videoResponse.Items?.FirstOrDefault();
+
+            if (videoItem == null)
+            {
+                model.ErrorMessage = "Video bulunamadı. Gizli veya silinmiş olabilir.";
+                return View(model);
+            }
+
+            model.VideoTitle = videoItem.Snippet.Title;
+            model.ChannelName = videoItem.Snippet.ChannelTitle;
+            model.ThumbnailUrl = videoItem.Snippet.Thumbnails.High?.Url ?? "";
+            model.TotalCommentCount = videoItem.Statistics.CommentCount;
+
+            // 2. Videonun En Alakalı 50 Yorumunu Çek
+            var commentRequest = youtubeService.CommentThreads.List("snippet");
+            commentRequest.VideoId = videoId;
+            commentRequest.MaxResults = 50; 
+            commentRequest.Order = CommentThreadsResource.ListRequest.OrderEnum.Relevance; // En çok beğeni alanları/alakalıları getir
+            
+            var commentResponse = await commentRequest.ExecuteAsync();
+
+            model.Comments = commentResponse.Items.Select(c => new CommentItem
+            {
+                AuthorName = c.Snippet.TopLevelComment.Snippet.AuthorDisplayName,
+                AuthorProfileImageUrl = c.Snippet.TopLevelComment.Snippet.AuthorProfileImageUrl,
+                TextOriginal = c.Snippet.TopLevelComment.Snippet.TextOriginal, // Yorumun saf metni
+                LikeCount = c.Snippet.TopLevelComment.Snippet.LikeCount,
+                PublishedAt = c.Snippet.TopLevelComment.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy HH:mm") ?? ""
+            }).ToList();
+        }
+        catch (Google.GoogleApiException ex) when (ex.Message.Contains("disabled comments"))
+        {
+            model.ErrorMessage = "Bu videonun yorumları kanal sahibi tarafından kapatılmış.";
+        }
+        catch (Exception)
+        {
+            model.ErrorMessage = "Yorumlar çekilirken beklenmeyen bir hata oluştu.";
+        }
+
+        return View(model);
+    }
+}
