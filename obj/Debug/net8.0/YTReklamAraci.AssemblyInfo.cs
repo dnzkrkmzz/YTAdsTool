@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("YTReklamAraci")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c3ad0597fdfd7f0ac5363530f2db8a9bb08da976")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+05d52ba292d81794ae256485b42d30a5e4dd0faf")]
 [assembly: System.Reflection.AssemblyProductAttribute("YTReklamAraci")]
 [assembly: System.Reflection.AssemblyTitleAttribute("YTReklamAraci")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

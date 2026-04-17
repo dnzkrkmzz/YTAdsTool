@@ -23,11 +23,14 @@ public class HomeController : Controller
 
     public IActionResult Index()
     {
+        var today = DateTime.Today; 
+
         ViewBag.TopTrends = _context.SearchCaches
-                                    .OrderByDescending(x => x.SearchCount)
-                                    .Take(5)
-                                    .Select(x => x.Keyword)
-                                    .ToList();
+            .Where(x => x.SearchDate >= today) // Sadece bugün arananları getir
+            .OrderByDescending(x => x.SearchCount)
+            .Take(5)
+            .Select(x => x.Keyword)
+            .ToList();
 
         return View(new List<YoutubeVideo>());
     }
@@ -73,11 +76,28 @@ public class HomeController : Controller
             searchRequest.MaxResults = 20;
 
             // YENİ EKLENEN FİLTRE MANTIKLARI
-            if (dateFilter == "month") searchRequest.PublishedAfterDateTimeOffset = DateTimeOffset.UtcNow.AddMonths(-1);
-            else if (dateFilter == "year") searchRequest.PublishedAfterDateTimeOffset = DateTimeOffset.UtcNow.AddYears(-1);
+            if (dateFilter != "all")
+            {
+                searchRequest.PublishedAfterDateTimeOffset = dateFilter switch
+                {
+                    "today" => DateTimeOffset.UtcNow.AddDays(-1),
+                    "week" => DateTimeOffset.UtcNow.AddDays(-7),
+                    "month" => DateTimeOffset.UtcNow.AddMonths(-1),
+                    "year" => DateTimeOffset.UtcNow.AddYears(-1),
+                    _ => null
+                };
+            }
 
-            if (durationFilter == "short") searchRequest.VideoDuration = SearchResource.ListRequest.VideoDurationEnum.Short__; // 4 dakikadan az
-            else if (durationFilter == "long") searchRequest.VideoDuration = SearchResource.ListRequest.VideoDurationEnum.Long__;   // 20 dakikadan uzun
+            if (durationFilter != "all")
+            {
+                searchRequest.VideoDuration = durationFilter switch
+                {
+                    "short" => SearchResource.ListRequest.VideoDurationEnum.Short__,
+                    "medium" => SearchResource.ListRequest.VideoDurationEnum.Medium,
+                    "long" => SearchResource.ListRequest.VideoDurationEnum.Long__,
+                    _ => SearchResource.ListRequest.VideoDurationEnum.Any
+                };
+            }
 
             if (hdOnly) searchRequest.VideoDefinition = SearchResource.ListRequest.VideoDefinitionEnum.High;
 
@@ -125,13 +145,15 @@ public class HomeController : Controller
 
         var distinctVideos = allVideos.GroupBy(v => v.VideoUrl).Select(g => g.First()).ToList();
 
-        // Trendlerde sadece "filtresiz" (içinde | işareti olmayan) aramaları gösteriyoruz
+        // Trendlerde sadece "filtresiz" aramaları VE SADECE BUGÜN arananları gösteriyoruz
+        var today = DateTime.Today; 
+        
         ViewBag.TopTrends = _context.SearchCaches
-                                    .Where(x => !x.Keyword.Contains("|"))
-                                    .OrderByDescending(x => x.SearchCount)
-                                    .Take(5)
-                                    .Select(x => x.Keyword)
-                                    .ToList();
+            .Where(x => !x.Keyword.Contains("|") && x.SearchDate >= today)
+            .OrderByDescending(x => x.SearchCount)
+            .Take(5)
+            .Select(x => x.Keyword)
+            .ToList();
 
         return View("Index", distinctVideos);
     }
@@ -169,13 +191,14 @@ public class HomeController : Controller
     }
 
     // --- YENİ ARAÇ: SEO VE ETİKET ANALİZİ ---
-
+    [Route("taganalyzer")]
     public IActionResult TagAnalyzer()
     {
         return View(new TagAnalyzerViewModel());
     }
 
     [HttpPost]
+    [Route("taganalyzer")]
     public async Task<IActionResult> TagAnalyzer(string videoUrl)
     {
         var model = new TagAnalyzerViewModel { VideoUrl = videoUrl };
@@ -228,13 +251,14 @@ public class HomeController : Controller
     }
 
     // --- YENİ ARAÇ: DETAYLI KANAL ANALİZİ ---
-
+    [Route("channelanalyzer")]
     public IActionResult ChannelAnalyzer()
     {
         return View(new ChannelViewModel());
     }
 
     [HttpPost]
+    [Route("channelanalyzer")]
     public async Task<IActionResult> ChannelAnalyzer(string channelUrl)
     {
         var model = new ChannelViewModel();
@@ -300,13 +324,14 @@ public class HomeController : Controller
     }
 
     // --- YENİ ARAÇ: YORUM VE KİTLE ANALİZİ ---
-
+    [Route("commentanalyzer")]
     public IActionResult CommentAnalyzer()
     {
         return View(new CommentAnalyzerViewModel());
     }
 
     [HttpPost]
+    [Route("commentanalyzer")]
     public async Task<IActionResult> CommentAnalyzer(string videoUrl)
     {
         var model = new CommentAnalyzerViewModel { VideoUrl = videoUrl };
@@ -377,6 +402,7 @@ public class HomeController : Controller
     }
 
     [HttpGet]
+    [Route("commenthunter")]
     // GET: Yorum Avcısı Sayfası
     public IActionResult CommentHunter()
     {
@@ -385,6 +411,7 @@ public class HomeController : Controller
 
 // POST: Yorumlarda Arama Yapma
     [HttpPost]
+    [Route("commenthunter")]
     public async Task<IActionResult> CommentHunter(string mainKeywords, string commentKeywords, string dateFilter, string durationFilter, bool hdOnly)
     {
         if (string.IsNullOrEmpty(mainKeywords) || string.IsNullOrEmpty(commentKeywords))
