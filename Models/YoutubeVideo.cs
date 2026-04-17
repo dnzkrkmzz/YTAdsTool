@@ -9,4 +9,5 @@ public class YoutubeVideo
     public ulong? ViewCount { get; set; }
     public ulong? LikeCount { get; set; }
     public string PublishedAt { get; set; } = string.Empty;
+    public string? CategoryName { get; set; }
 }

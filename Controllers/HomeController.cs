@@ -21,6 +21,28 @@ public class HomeController : Controller
         _context = context;
     }
 
+    // YouTube Kategori Numaralarını Türkçeye Çeviren Sözlük (YENİ EKLENDİ)
+    private string GetCategoryName(string categoryId)
+    {
+        return categoryId switch
+        {
+            "1" => "🎬 Film/Animasyon",
+            "2" => "🚗 Otomobiller",
+            "10" => "🎵 Müzik",
+            "15" => "🐾 Evcil Hayvanlar",
+            "17" => "⚽ Spor",
+            "20" => "🎮 Oyun",
+            "22" => "👤 Kişiler/Bloglar",
+            "23" => "🤣 Komedi",
+            "24" => "🎭 Eğlence",
+            "25" => "📰 Haber/Politika",
+            "26" => "👗 Stil/Nasıl Yapılır",
+            "27" => "📚 Eğitim",
+            "28" => "🔬 Bilim/Teknoloji",
+            _ => "Bilinmeyen (" + categoryId + ")"
+        };
+    }
+
     public IActionResult Index()
     {
         var today = DateTime.Today; 
@@ -36,15 +58,16 @@ public class HomeController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> Search(string keyword, string dateFilter = "all", string durationFilter = "all", bool hdOnly = false)
+    [Route("search")]
+    public async Task<IActionResult> Search(string keyword, List<string> excludedCategories, string dateFilter = "all", string durationFilter = "all", bool hdOnly = false, string sortBy = "relevance")
     {
         if (string.IsNullOrEmpty(keyword)) return View("Index", new List<YoutubeVideo>());
 
         var keywordList = keyword.Split(',')
-                                 .Select(k => k.ToLower().Trim())
-                                 .Where(k => !string.IsNullOrEmpty(k))
-                                 .Distinct()
-                                 .ToList();
+                                .Select(k => k.ToLower().Trim())
+                                .Where(k => !string.IsNullOrEmpty(k))
+                                .Distinct()
+                                .ToList();
 
         var allVideos = new List<YoutubeVideo>();
         var apiKey = _config["YouTubeSettings:ApiKey"];
@@ -52,9 +75,10 @@ public class HomeController : Controller
 
         foreach (var word in keywordList)
         {
-            // Eğer filtre kullanılmışsa, cache adını değiştiriyoruz ki trendler bozulmasın
-            bool hasFilter = dateFilter != "all" || durationFilter != "all" || hdOnly;
-            string cacheKey = hasFilter ? $"{word}|{dateFilter}|{durationFilter}|{hdOnly}" : word;
+            // YENİ: Cache ismini ayarlarken hariç tutulan kategorileri de dahil ediyoruz
+            string excludeKey = excludedCategories != null && excludedCategories.Any() ? string.Join("-", excludedCategories) : "none";
+            bool hasFilter = dateFilter != "all" || durationFilter != "all" || hdOnly || (excludedCategories != null && excludedCategories.Any()) || sortBy != "relevance";
+            string cacheKey = hasFilter ? $"{word}|{dateFilter}|{durationFilter}|{hdOnly}|{excludeKey}|{sortBy}" : word;
 
             var cachedResult = _context.SearchCaches.FirstOrDefault(s => s.Keyword == cacheKey);
 
@@ -73,7 +97,15 @@ public class HomeController : Controller
             var searchRequest = youtubeService.Search.List("snippet");
             searchRequest.Q = word;
             searchRequest.Type = "video";
-            searchRequest.MaxResults = 20;
+            searchRequest.MaxResults = 50; // API kotasını aşmadan maksimum havuz
+
+            // YENİ: SIRALAMA MANTIĞI
+            searchRequest.Order = sortBy switch
+            {
+                "date" => SearchResource.ListRequest.OrderEnum.Date, // En Yeni
+                "viewCount" => SearchResource.ListRequest.OrderEnum.ViewCount, // En Çok İzlenen
+                _ => SearchResource.ListRequest.OrderEnum.Relevance // Alaka Düzeyi (Varsayılan)
+            };
 
             // YENİ EKLENEN FİLTRE MANTIKLARI
             if (dateFilter != "all")
@@ -110,7 +142,17 @@ public class HomeController : Controller
             videoRequest.Id = string.Join(",", videoIds);
             var videoResponse = await videoRequest.ExecuteAsync();
 
-            var videoList = videoResponse.Items.Select(item => new YoutubeVideo
+            // İŞTE SİHİRLİ KISIM: HARİÇ TUTULAN KATEGORİLERİ ELEME
+            var filteredItems = videoResponse.Items.AsEnumerable();
+
+            if (excludedCategories != null && excludedCategories.Any())
+            {
+                // Videonun kategori ID'si, kullanıcının elediği listede YOKSA onu alıyoruz.
+                filteredItems = filteredItems.Where(item => !excludedCategories.Contains(item.Snippet.CategoryId));
+            }
+
+            // Eleme yapıldıktan sonra kalanlardan en tepeki 20 tanesini alıp dönüştürüyoruz
+            var videoList = filteredItems.Take(20).Select(item => new YoutubeVideo
             {
                 Title = item.Snippet.Title,
                 VideoUrl = "https://www.youtube.com/watch?v=" + item.Id,
@@ -118,7 +160,8 @@ public class HomeController : Controller
                 ChannelUrl = "https://www.youtube.com/channel/" + item.Snippet.ChannelId,
                 ViewCount = item.Statistics.ViewCount,
                 LikeCount = item.Statistics.LikeCount,
-                PublishedAt = item.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? ""
+                PublishedAt = item.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? "",
+                CategoryName = GetCategoryName(item.Snippet.CategoryId) // YENİ: Kategori ismini modele aktarıyoruz
             }).ToList();
 
             allVideos.AddRange(videoList);
@@ -143,7 +186,8 @@ public class HomeController : Controller
             await _context.SaveChangesAsync();
         }
 
-        var distinctVideos = allVideos.GroupBy(v => v.VideoUrl).Select(g => g.First()).ToList();
+        // Çoklu kelime arandığında bile ekrana basılacak maksimum video sayısını 50 ile sınırladık (Take 50)
+        var distinctVideos = allVideos.GroupBy(v => v.VideoUrl).Select(g => g.First()).Take(50).ToList();
 
         // Trendlerde sadece "filtresiz" aramaları VE SADECE BUGÜN arananları gösteriyoruz
         var today = DateTime.Today; 
