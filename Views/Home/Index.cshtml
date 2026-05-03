@@ -1,159 +1,176 @@
-﻿@model List<YTReklamAraci.Models.YoutubeVideo>
-
+﻿@model List<YoutubeVideo>
 @{
-    ViewData["Title"] = "YT Ads Tool";
+    ViewData["Title"] = "Keyword Targeting";
 }
 
-<div class="container mt-5">
-    <div class="text-center mb-5">
-        <h1 class="display-4">YT Ads Tool</h1>
-        <p class="lead">Kelimeye göre hedeflenebilir video ve kanal listesi oluşturun.</p>
-    </div>
-    
-    <div class="row justify-content-center mb-4">
-        <div class="col-md-8">
-            <form asp-action="Search" method="post" class="mb-4">
+<div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+    <div class="card-body p-4">
+        <form asp-action="Search" method="post">
+            
             <div class="row g-2 mb-3 align-items-stretch" style="min-height: 52px;">
                 
                 <div class="col-lg-6 col-md-12">
-                    <input type="text" name="keyword" class="form-control form-control-lg shadow-sm border-light h-100" style="border-radius: 10px; font-size: 1rem;" placeholder="Anahtar kelime girin... (Örn: Video Hedefleme)" required>
+                    <input type="text" name="keyword" class="form-control form-control-lg border-light shadow-sm h-100" style="border-radius: 10px; font-size: 1rem; background-color: #f8f9fa;" placeholder="Anahtar kelime girin... (Örn: Video Hedefleme)" required>
                 </div>
                 
                 <div class="col-lg-4 col-md-8 mt-2 mt-lg-0">
                     <div class="dropdown h-100">
-                        <button class="btn btn-white bg-white w-100 shadow-sm border-light d-flex justify-content-between align-items-center h-100 text-nowrap" style="border-radius: 10px; color: #495057; font-size: 0.95rem;" type="button" id="excludeDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                            <span><span class="text-danger fw-bold me-1" style="font-size: 1.1rem;">✕</span> Kategori Hariç Tut</span>
+                        <button class="btn btn-white bg-white w-100 shadow-sm border-light d-flex justify-content-between align-items-center h-100 text-nowrap" style="border-radius: 10px; color: #495057; font-size: 0.95rem; background-color: #f8f9fa;" type="button" id="categoryDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                            <span><i class="bi bi-funnel-fill text-primary me-1"></i> Kategori Filtresi</span>
                             <span class="caret text-muted small">▼</span>
                         </button>
-                        <ul class="dropdown-menu w-100 shadow-lg border-0 p-3" aria-labelledby="excludeDropdown" style="max-height: 300px; overflow-y: auto; border-radius: 12px;">
-                            <li><h6 class="dropdown-header text-danger fw-bold">Bu Kategorileri Gösterme:</h6></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="10" id="cat10"><label class="form-check-label" for="cat10">🎵 Müzik</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="25" id="cat25"><label class="form-check-label" for="cat25">📰 Haberler ve Politika</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="20" id="cat20"><label class="form-check-label" for="cat20">🎮 Oyun</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="24" id="cat24"><label class="form-check-label" for="cat24">🎭 Eğlence</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="22" id="cat22"><label class="form-check-label" for="cat22">👤 Kişiler ve Bloglar</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="17" id="cat17"><label class="form-check-label" for="cat17">⚽ Spor</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="1" id="cat1"><label class="form-check-label" for="cat1">🎬 Film ve Animasyon</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="27" id="cat27"><label class="form-check-label" for="cat27">📚 Eğitim</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="28" id="cat28"><label class="form-check-label" for="cat28">🔬 Bilim ve Teknoloji</label></div></li>
-                            <li><div class="form-check ms-2"><input class="form-check-input" type="checkbox" name="excludedCategories" value="26" id="cat26"><label class="form-check-label" for="cat26">👗 Nasıl Yapılır ve Stil</label></div></li>
-                        </ul>
+                        <div class="dropdown-menu w-100 shadow-lg border-0 p-3" aria-labelledby="categoryDropdown" style="min-width: 320px; border-radius: 12px;">
+                            
+                            <ul class="nav nav-pills nav-fill mb-3 bg-light rounded p-1 shadow-sm" id="pills-tab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active py-1 small fw-bold" id="pills-include-tab" data-bs-toggle="pill" data-bs-target="#pills-include" type="button" role="tab">Dahil Et</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-1 small fw-bold" id="pills-exclude-tab" data-bs-toggle="pill" data-bs-target="#pills-exclude" type="button" role="tab">Hariç Tut</button>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content" id="pills-tabContent" style="max-height: 250px; overflow-y: auto;">
+                                
+                                <div class="tab-pane fade show active" id="pills-include" role="tabpanel">
+                                    <h6 class="dropdown-header text-success fw-bold px-1"><i class="bi bi-check-circle-fill"></i> Sadece Bunları Getir:</h6>
+                                    <hr class="dropdown-divider mb-2">
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="10" id="inc10"><label class="form-check-label" for="inc10">🎵 Müzik</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="25" id="inc25"><label class="form-check-label" for="inc25">📰 Haberler ve Politika</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="20" id="inc20"><label class="form-check-label" for="inc20">🎮 Oyun</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="24" id="inc24"><label class="form-check-label" for="inc24">🎭 Eğlence</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="22" id="inc22"><label class="form-check-label" for="inc22">👤 Kişiler ve Bloglar</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="17" id="inc17"><label class="form-check-label" for="inc17">⚽ Spor</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="1" id="inc1"><label class="form-check-label" for="inc1">🎬 Film ve Animasyon</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="27" id="inc27"><label class="form-check-label" for="inc27">📚 Eğitim</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="28" id="inc28"><label class="form-check-label" for="inc28">🔬 Bilim ve Teknoloji</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="includedCategories" value="26" id="inc26"><label class="form-check-label" for="inc26">👗 Nasıl Yapılır ve Stil</label></div>
+                                </div>
+
+                                <div class="tab-pane fade" id="pills-exclude" role="tabpanel">
+                                    <h6 class="dropdown-header text-danger fw-bold px-1"><i class="bi bi-x-circle-fill"></i> Bunları Gizle:</h6>
+                                    <hr class="dropdown-divider mb-2">
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="10" id="exc10"><label class="form-check-label" for="exc10">🎵 Müzik</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="25" id="exc25"><label class="form-check-label" for="exc25">📰 Haberler ve Politika</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="20" id="exc20"><label class="form-check-label" for="exc20">🎮 Oyun</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="24" id="exc24"><label class="form-check-label" for="exc24">🎭 Eğlence</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="22" id="exc22"><label class="form-check-label" for="exc22">👤 Kişiler ve Bloglar</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="17" id="exc17"><label class="form-check-label" for="exc17">⚽ Spor</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="1" id="exc1"><label class="form-check-label" for="exc1">🎬 Film ve Animasyon</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="27" id="exc27"><label class="form-check-label" for="exc27">📚 Eğitim</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="28" id="exc28"><label class="form-check-label" for="exc28">🔬 Bilim ve Teknoloji</label></div>
+                                    <div class="form-check ms-1"><input class="form-check-input" type="checkbox" name="excludedCategories" value="26" id="exc26"><label class="form-check-label" for="exc26">👗 Nasıl Yapılır ve Stil</label></div>
+                                </div>
+                                
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="col-lg-2 col-md-4 mt-2 mt-lg-0">
                     <button type="submit" class="btn w-100 shadow-sm border-0 d-flex justify-content-center align-items-center gap-2 h-100 fw-bold" style="border-radius: 10px; background: linear-gradient(135deg, #ff416c, #ff4b2b); color: white; font-size: 1rem;">
                         <svg width="18" height="18" fill="currentColor" class="bi bi-crosshair" viewBox="0 0 16 16">
-                        <path d="M8.5.5a.5.5 0 0 0-1 0v.518A7 7 0 0 0 1.018 7.5H.5a.5.5 0 0 0 0 1h.518A7 7 0 0 0 7.5 14.982v.518a.5.5 0 0 0 1 0v-.518A7 7 0 0 0 14.982 8.5h.518a.5.5 0 0 0 0-1h-.518A7 7 0 0 0 8.5 1.018V.5Zm-2 7.5a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm2-1a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>
+                          <path d="M8.5.5a.5.5 0 0 0-1 0v.518A7 7 0 0 0 1.018 7.5H.5a.5.5 0 0 0 0 1h.518A7 7 0 0 0 7.5 14.982v.518a.5.5 0 0 0 1 0v-.518A7 7 0 0 0 14.982 8.5h.518a.5.5 0 0 0 0-1h-.518A7 7 0 0 0 8.5 1.018V.5Zm-2 7.5a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm2-1a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>
                         </svg>
                         Hedefle
                     </button>
                 </div>
             </div>
 
-                <div class="mt-2 text-center text-md-end">
-                    <a class="text-decoration-none text-primary fw-bold" data-bs-toggle="collapse" href="#advancedSearchFilters" role="button" aria-expanded="false" aria-controls="advancedSearchFilters">
-                        <small>Gelişmiş Filtreler ↓</small>
-                    </a>
-                </div>
-                
-                <div class="collapse mt-2 text-start" id="advancedSearchFilters">
-                    <div class="card card-body bg-light border-0 shadow-sm" style="border-radius: 10px;">
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Sıralama</label>
-                                <select name="sortBy" class="form-select form-select-sm">
-                                    <option value="relevance">Alaka Düzeyi</option>
-                                    <option value="date">En Yeni Videolar</option>
-                                    <option value="viewCount">En Çok İzlenenler</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Yüklenme Tarihi</label>
-                                <select name="dateFilter" class="form-select form-select-sm">
-                                    <option value="all">Farketmez</option>
-                                    <option value="today">Bugün</option>
-                                    <option value="week">Bu Hafta</option>
-                                    <option value="month">Bu Ay</option>
-                                    <option value="year">Bu Yıl</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Video Süresi</label>
-                                <select name="durationFilter" class="form-select form-select-sm">
-                                    <option value="all">Farketmez</option>
-                                    <option value="short">Kısa (< 4 dk)</option>
-                                    <option value="medium">Orta (4-20 dk)</option>
-                                    <option value="long">Uzun (> 20 dk)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3 d-flex align-items-end pb-1">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="hdOnly" value="true" id="hdOnlySearchCheck">
-                                    <label class="form-check-label text-muted fw-bold" style="font-size: 0.85rem;" for="hdOnlySearchCheck">
-                                        Sadece HD Videolar
-                                    </label>
-                                </div>
+            <div class="text-center text-muted mb-3" style="font-size: 0.85rem;">
+                Birden fazla kelimeyi virgül (,) ile ayırarak girebilirsiniz.
+            </div>
+
+            <div class="text-end">
+                <a class="text-decoration-none text-primary fw-bold" data-bs-toggle="collapse" href="#advancedSearchFilters" role="button" aria-expanded="false" aria-controls="advancedSearchFilters">
+                    <small>Gelişmiş Filtreler ↓</small>
+                </a>
+            </div>
+            
+            <div class="collapse mt-3 text-start" id="advancedSearchFilters">
+                <div class="p-3 bg-white border shadow-sm" style="border-radius: 10px;">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Sıralama</label>
+                            <select name="sortBy" class="form-select form-select-sm">
+                                <option value="relevance">Alaka Düzeyi</option>
+                                <option value="date">En Yeni Videolar</option>
+                                <option value="viewCount">En Çok İzlenenler</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Yüklenme Tarihi</label>
+                            <select name="dateFilter" class="form-select form-select-sm">
+                                <option value="all">Farketmez</option>
+                                <option value="today">Bugün</option>
+                                <option value="week">Bu Hafta</option>
+                                <option value="month">Bu Ay</option>
+                                <option value="year">Bu Yıl</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Video Süresi</label>
+                            <select name="durationFilter" class="form-select form-select-sm">
+                                <option value="all">Farketmez</option>
+                                <option value="short">Kısa (< 4 dk)</option>
+                                <option value="medium">Orta (4-20 dk)</option>
+                                <option value="long">Uzun (> 20 dk)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end pb-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="hdOnly" value="true" id="hdOnlySearchCheck">
+                                <label class="form-check-label text-muted fw-bold" style="font-size: 0.85rem;" for="hdOnlySearchCheck">
+                                    Sadece HD Videolar
+                                </label>
                             </div>
                         </div>
                     </div>
                 </div>
-            </form>
-            
-            <div class="text-center">
-                <small class="text-muted d-block mb-3">Birden fazla kelimeyi virgül (,) ile ayırarak girebilirsiniz.</small>
-                
+            </div>
+        </form>
+        
+        @if (Model == null || !Model.Any())
+        {
+            <div class="mt-4 text-center">
+                <span class="text-muted small"><i class="bi bi-fire text-danger"></i> Bugünün Trend Kelimeleri:</span>
                 @if (ViewBag.TopTrends != null)
                 {
-                    var trends = ViewBag.TopTrends as List<string>;
-                    if (trends != null && trends.Any())
+                    foreach (var trend in (List<string>)ViewBag.TopTrends)
                     {
-                        <div class="d-flex justify-content-center align-items-center flex-wrap">
-                            <span class="text-muted small me-2 mb-1">
-                                <i class="bi bi-graph-up-arrow"></i> 🔥 Bugünün Trend Kelimeleri:
-                            </span>
-                            @foreach (var trend in trends)
-                            {
-                                <form asp-action="Search" method="post" class="d-inline">
-                                    <input type="hidden" name="keyword" value="@trend" />
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill me-1 mb-1" title="@trend">
-                                        @(trend.Length > 35 ? trend.Substring(0, 35) + "..." : trend)
-                                    </button>
-                                </form>
-                            }
-                        </div>
+                        <span class="badge rounded-pill border text-secondary ms-1 shadow-sm">@trend</span>
                     }
                 }
-                </div>
-        </div>
+            </div>
+        }
     </div>
+</div>
 
-    @if (Model != null && Model.Any())
-    {
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>Sonuçlar (@Model.Count Video)</h3>
-            
-            @* Excel Formu *@
-            <form asp-action="ExportToExcel" method="post">
-                @for (int i = 0; i < Model.Count; i++)
-                {
-                    <input type="hidden" name="[@i].Title" value="@Model[i].Title" />
-                    <input type="hidden" name="[@i].VideoUrl" value="@Model[i].VideoUrl" />
-                    <input type="hidden" name="[@i].ChannelTitle" value="@Model[i].ChannelTitle" />
-                    <input type="hidden" name="[@i].ViewCount" value="@Model[i].ViewCount" />
-                    <input type="hidden" name="[@i].PublishedAt" value="@Model[i].PublishedAt" />
-                }
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel"></i> Excel Olarak İndir
-                </button>
-            </form>
-        </div>
+@if (Model != null && Model.Any())
+{
+    <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold m-0 text-dark">Sonuçlar <span class="text-muted fs-6">(@Model.Count Video)</span></h5>
+                
+                <form asp-action="ExportToExcel" method="post">
+                    @for (int i = 0; i < Model.Count; i++)
+                    {
+                        <input type="hidden" name="videos[@i].Title" value="@Model[i].Title" />
+                        <input type="hidden" name="videos[@i].VideoUrl" value="@Model[i].VideoUrl" />
+                        <input type="hidden" name="videos[@i].ChannelTitle" value="@Model[i].ChannelTitle" />
+                        <input type="hidden" name="videos[@i].ViewCount" value="@Model[i].ViewCount" />
+                        <input type="hidden" name="videos[@i].PublishedAt" value="@Model[i].PublishedAt" />
+                    }
+                    <button type="submit" class="btn btn-success btn-sm shadow-sm d-flex align-items-center gap-2">
+                        <i class="bi bi-file-earmark-excel"></i> Excel Olarak İndir
+                    </button>
+                </form>
+            </div>
 
-        <div class="card shadow">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-light text-muted">
                         <tr>
                             <th>Video</th>
                             <th>Kanal</th>
@@ -164,16 +181,16 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var video in Model)
+                        @foreach (var item in Model)
                         {
                             <tr>
-                                <td><small>@video.Title</small></td>
-                                <td><small>@video.ChannelTitle</small></td>
-                                <td><span class="badge bg-secondary text-light">@video.CategoryName</span></td>
-                                <td><span class="badge bg-info text-dark">@video.ViewCount?.ToString("N0")</span></td>
-                                <td><small>@video.PublishedAt</small></td>
+                                <td><small class="fw-semibold text-dark">@item.Title</small></td>
+                                <td><small class="text-muted">@item.ChannelTitle</small></td>
+                                <td><span class="badge bg-secondary text-light">@item.CategoryName</span></td>
+                                <td><span class="badge bg-info text-dark">@item.ViewCount?.ToString("N0")</span></td>
+                                <td><small class="text-muted">@item.PublishedAt</small></td>
                                 <td>
-                                    <a href="@video.VideoUrl" target="_blank" class="btn btn-outline-danger btn-sm">Aç</a>
+                                    <a href="@item.VideoUrl" target="_blank" class="btn btn-outline-danger btn-sm rounded-pill px-3">Aç</a>
                                 </td>
                             </tr>
                         }
@@ -181,11 +198,5 @@
                 </table>
             </div>
         </div>
-    }
-    else if (Model != null)
-    {
-        <div class="alert alert-info text-center">
-            Arama yapmak için yukarıdaki kutucuğu kullanın.
-        </div>
-    }
-</div>
+    </div>
+}

@@ -1,68 +1,64 @@
 @model YTReklamAraci.Models.TagAnalyzerViewModel
-
 @{
     ViewData["Title"] = "Tag Analyzer";
 }
 
-<div class="container mt-5">
-    <div class="text-center mb-5">
-        <h1 class="display-5"><i class="bi bi-tags text-danger"></i> Video Etiket (Tag) Analizi</h1>
-        <p class="lead">Rakiplerinizin videolarında hangi gizli etiketleri kullandığını anında keşfedin.</p>
-    </div>
-
-    <div class="row justify-content-center mb-4">
-        <div class="col-md-8">
-            <form asp-action="TagAnalyzer" method="post" class="input-group shadow-sm mb-2">
-                <input type="text" name="videoUrl" class="form-control form-control-lg" 
-                       placeholder="YouTube Video Linkini Yapıştırın... (Örn: https://www.youtube.com/watch?v=...)" 
-                       value="@Model.VideoUrl">
-                <button class="btn btn-danger btn-lg" type="submit">
-                    Analiz Et
-                </button>
-            </form>
-            
-            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
-            {
-                <div class="alert alert-warning mt-3 text-center">@Model.ErrorMessage</div>
-            }
-        </div>
-    </div>
-
-    @if (!string.IsNullOrEmpty(Model.VideoTitle))
-    {
-        <div class="row mt-4">
-            <div class="col-md-4">
-                <div class="card shadow">
-                    <img src="@Model.ThumbnailUrl" class="card-img-top" alt="Thumbnail">
-                    <div class="card-body">
-                        <h6 class="card-title">@Model.VideoTitle</h6>
-                        <p class="card-text text-muted small"><i class="bi bi-person-video"></i> @Model.ChannelName</p>
-                    </div>
+<div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+    <div class="card-body p-4">
+        <form asp-action="TagAnalyzer" method="post">
+            <div class="row g-2 align-items-stretch" style="min-height: 52px;">
+                <div class="col-lg-9 col-md-12">
+                    <input type="text" asp-for="VideoUrl" class="form-control form-control-lg border-0 shadow-sm h-100" style="border-radius: 10px; background-color: #f8f9fa; font-size: 1rem;" placeholder="YouTube Video URL'si yapıştırın..." required>
+                </div>
+                <div class="col-lg-3 col-md-12 mt-2 mt-lg-0">
+                    <button type="submit" class="btn w-100 shadow-sm border-0 d-flex justify-content-center align-items-center gap-2 h-100 fw-bold" style="border-radius: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; font-size: 1rem;">
+                        <i class="bi bi-tags-fill"></i> Etiketleri Bul
+                    </button>
                 </div>
             </div>
-            
-            <div class="col-md-8">
-                <div class="card shadow h-100">
-                    <div class="card-header bg-dark text-white">
-                        <i class="bi bi-hash"></i> Kullanılan Etiketler (@Model.Tags.Count adet)
-                    </div>
-                    <div class="card-body">
-                        @if (Model.Tags.Any())
-                        {
-                            <div class="d-flex flex-wrap gap-2">
-                                @foreach (var tag in Model.Tags)
-                                {
-                                    <span class="badge bg-secondary fs-6 p-2">@tag</span>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-info">Bu videoda herhangi bir etiket (tag) kullanılmamış.</div>
-                        }
-                    </div>
-                </div>
+        </form>
+
+        @if (!string.IsNullOrEmpty(Model?.ErrorMessage))
+        {
+            <div class="alert alert-danger mt-3 mb-0 border-0 shadow-sm" style="border-radius: 10px;">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> @Model.ErrorMessage
             </div>
-        </div>
-    }
+        }
+    </div>
 </div>
+
+@if (!string.IsNullOrEmpty(Model?.VideoTitle))
+{
+    <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Analiz Sonuçları</h5>
+            
+            <div class="row">
+                <div class="col-md-4 mb-3 mb-md-0 text-center">
+                    <img src="@Model.ThumbnailUrl" class="img-fluid rounded shadow-sm mb-3" alt="Thumbnail">
+                    <h6 class="fw-bold text-dark">@Model.VideoTitle</h6>
+                    <p class="text-muted small mb-0"><i class="bi bi-person-video"></i> @Model.ChannelName</p>
+                </div>
+                
+                <div class="col-md-8">
+                    <h6 class="fw-bold text-muted mb-3"><i class="bi bi-hash"></i> Kullanılan Etiketler (@(Model.Tags?.Count ?? 0))</h6>
+                    @if (Model.Tags != null && Model.Tags.Any())
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var tag in Model.Tags)
+                            {
+                                <span class="badge bg-light text-dark border shadow-sm p-2" style="font-size: 0.85rem;">@tag</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-light border shadow-sm text-muted" style="border-radius: 10px;">
+                            Bu videoda herhangi bir etiket kullanılmamış.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}

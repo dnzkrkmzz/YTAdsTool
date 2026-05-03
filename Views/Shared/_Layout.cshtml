@@ -1,62 +1,150 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - YTAdsTool</title>
-    <script type="importmap"></script>
+    <title>@ViewData["Title"] - YT Ads Tool</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/YTReklamAraci.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        body { 
+            background-color: #f4f6f9; /* Panellerin patlaması için açık gri arka plan */
+            overflow-x: hidden; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #wrapper { display: flex; width: 100%; align-items: stretch; }
+        
+        /* Sol Menü (Sidebar) Tasarımı */
+        #sidebar { 
+            min-width: 260px; 
+            max-width: 260px; 
+            background: #1e1e2d; /* Şık koyu lacivert/siyah */
+            color: #fff; 
+            min-height: 100vh; 
+            transition: all 0.3s; 
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        #sidebar .sidebar-header { padding: 25px 20px; background: #1a1a27; text-align: center; }
+        #sidebar ul.components { padding: 20px 0; }
+        #sidebar ul li a { 
+            padding: 15px 25px; 
+            font-size: 1.05em; 
+            display: flex; 
+            align-items: center;
+            color: #a2a3b7; 
+            text-decoration: none; 
+            transition: 0.3s; 
+            border-left: 4px solid transparent;
+        }
+        #sidebar ul li a:hover { 
+            color: #fff; 
+            background: #1b1b29; 
+            border-left: 4px solid #f64e60; /* Hover durumunda şık kırmızı çizgi */
+        }
+        /* Aktif sayfa efekti için class eklenebilir */
+        #sidebar ul li a i { margin-right: 15px; font-size: 1.2rem; }
+        
+        /* Sağ İçerik Alanı */
+        #content { width: 100%; transition: all 0.3s; display: flex; flex-direction: column;}
+        
+        /* Üst Bar (Topbar) */
+        .top-navbar { 
+            background: #fff; 
+            padding: 15px 30px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .main-content { padding: 30px; flex-grow: 1;}
+        
+       /* Mobil Uyumluluk */
+        @@media (max-width: 768px) {
+            #sidebar { margin-left: -260px; position: fixed; z-index: 999; }
+            #sidebar.active { margin-left: 0; }
+            .mobile-overlay {
+                display: none; position: fixed; width: 100vw; height: 100vh;
+                background: rgba(0,0,0,0.5); z-index: 998;
+            }
+            .mobile-overlay.active { display: block; }
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">YT Ads Tool</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+    <div id="wrapper">
+        <div class="mobile-overlay" id="mobileOverlay"></div>
+
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <h4 class="m-0 fw-bold text-white tracking-wide">
+                    <i class="bi bi-youtube text-danger me-2"></i>YT Ads Tool
+                </h4>
+            </div>
+            <ul class="list-unstyled components">
+                <li class="small text-uppercase px-4 mb-2 mt-2" style="color: #4c4e6f; font-weight: 600; letter-spacing: 1px;">Analysis Tools</li>
+                
+                <li>
+                    <a href="/"><i class="bi bi-crosshair"></i> Keyword Targeting</a>
+                </li>
+                <li>
+                    <a href="/taganalyzer"><i class="bi bi-tags"></i> Tag Analyzer</a>
+                </li>
+                <li>
+                    <a href="/channelanalyzer"><i class="bi bi-person-video"></i> Channel Analyzer</a>
+                </li>
+                <li>
+                    <a href="/commentanalyzer"><i class="bi bi-chat-left-dots"></i> Comment Analyzer</a>
+                </li>
+                <li>
+                    <a href="/commenthunter"><i class="bi bi-search"></i> Comment Hunter</a>
+                </li>
+            </ul>
+        </nav>
+
+        <div id="content">
+            <div class="top-navbar">
+                <button type="button" id="sidebarCollapse" class="btn btn-light shadow-sm d-md-none">
+                    <i class="bi bi-list fs-4"></i>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark fw-bold" asp-area="" asp-controller="Home" asp-action="Index">Keyword Targeting</a>
-                        </li>
-                        @* <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li> *@
-                        <li class="nav-item">
-                            <a class="nav-link text-dark fw-bold" asp-area="" asp-controller="Home" asp-action="TagAnalyzer">Tag Analyzer</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark fw-bold" asp-controller="Home" asp-action="ChannelAnalyzer">Channel Analyzer</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark fw-bold" asp-controller="Home" asp-action="CommentAnalyzer">Comment Analyzer</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark fw-bold" asp-area="" asp-controller="Home" asp-action="CommentHunter">Comment Hunter</a>
-                        </li>
-                    </ul>
+                <div class="d-none d-md-block">
+                    <h5 class="m-0 fw-bold text-dark" style="opacity: 0.8;">@ViewData["Title"]</h5>
+                </div>
+                <div class="ms-auto d-flex align-items-center gap-3">
+                    <span class="badge bg-light text-dark border p-2 shadow-sm">
+                        <i class="bi bi-calendar3 text-danger me-1"></i> @DateTime.Now.ToString("dd MMM yyyy")
+                    </span>
+                    <div class="dropdown">
+                        <a href="#" class="d-block link-dark text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="https://ui-avatars.com/api/?name=Admin&background=random" alt="mdo" width="35" height="35" class="rounded-circle shadow-sm">
+                        </a>
+                        <ul class="dropdown-menu text-small dropdown-menu-end shadow-sm border-0 mt-2" aria-labelledby="dropdownUser">
+                            <li><a class="dropdown-item" href="#">Ayarlar</a></li>
+                            <li><a class="dropdown-item" href="#">Profil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#">Çıkış Yap</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+
+            <div class="main-content">
+                @RenderBody()
+            </div>
+        </div>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - YTAdsTool - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        // Mobilde Sol Menüyü Aç/Kapat Mantığı
+        $(document).ready(function () {
+            $('#sidebarCollapse, #mobileOverlay').on('click', function () {
+                $('#sidebar').toggleClass('active');
+                $('#mobileOverlay').toggleClass('active');
+            });
+        });
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

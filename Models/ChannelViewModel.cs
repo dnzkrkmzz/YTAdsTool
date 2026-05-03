@@ -13,4 +13,5 @@ public class ChannelViewModel
     public string PublishedAt { get; set; } = string.Empty;
     public List<YoutubeVideo> TopVideos { get; set; } = new List<YoutubeVideo>();
     public string ErrorMessage { get; set; } = string.Empty;
+    public string ChannelCategory { get; set; } = string.Empty;
 }

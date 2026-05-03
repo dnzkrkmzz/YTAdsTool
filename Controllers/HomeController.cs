@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using ClosedXML.Excel;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Linq; // LINQ kullanımı için
 
 namespace YTReklamAraci.Controllers;
 
@@ -21,7 +22,7 @@ public class HomeController : Controller
         _context = context;
     }
 
-    // YouTube Kategori Numaralarını Türkçeye Çeviren Sözlük (YENİ EKLENDİ)
+    // YouTube Kategori Numaralarını Türkçeye Çeviren Sözlük
     private string GetCategoryName(string categoryId)
     {
         return categoryId switch
@@ -48,7 +49,7 @@ public class HomeController : Controller
         var today = DateTime.Today; 
 
         ViewBag.TopTrends = _context.SearchCaches
-            .Where(x => x.SearchDate >= today) // Sadece bugün arananları getir
+            .Where(x => x.SearchDate >= today)
             .OrderByDescending(x => x.SearchCount)
             .Take(5)
             .Select(x => x.Keyword)
@@ -59,7 +60,8 @@ public class HomeController : Controller
 
     [HttpPost]
     [Route("search")]
-    public async Task<IActionResult> Search(string keyword, List<string> excludedCategories, string dateFilter = "all", string durationFilter = "all", bool hdOnly = false, string sortBy = "relevance")
+    // YENİ: List<string> includedCategories parametresi eklendi
+    public async Task<IActionResult> Search(string keyword, List<string> includedCategories, List<string> excludedCategories, string dateFilter = "all", string durationFilter = "all", bool hdOnly = false, string sortBy = "relevance")
     {
         if (string.IsNullOrEmpty(keyword)) return View("Index", new List<YoutubeVideo>());
 
@@ -75,10 +77,13 @@ public class HomeController : Controller
 
         foreach (var word in keywordList)
         {
-            // YENİ: Cache ismini ayarlarken hariç tutulan kategorileri de dahil ediyoruz
+            // YENİ: Cache ismini ayarlarken DAHİL EDİLEN kategorileri de ekliyoruz
+            string includeKey = includedCategories != null && includedCategories.Any() ? string.Join("-", includedCategories) : "none";
             string excludeKey = excludedCategories != null && excludedCategories.Any() ? string.Join("-", excludedCategories) : "none";
-            bool hasFilter = dateFilter != "all" || durationFilter != "all" || hdOnly || (excludedCategories != null && excludedCategories.Any()) || sortBy != "relevance";
-            string cacheKey = hasFilter ? $"{word}|{dateFilter}|{durationFilter}|{hdOnly}|{excludeKey}|{sortBy}" : word;
+            
+            bool hasFilter = dateFilter != "all" || durationFilter != "all" || hdOnly || (excludedCategories != null && excludedCategories.Any()) || (includedCategories != null && includedCategories.Any()) || sortBy != "relevance";
+            
+            string cacheKey = hasFilter ? $"{word}|{dateFilter}|{durationFilter}|{hdOnly}|{includeKey}|{excludeKey}|{sortBy}" : word;
 
             var cachedResult = _context.SearchCaches.FirstOrDefault(s => s.Keyword == cacheKey);
 
@@ -97,17 +102,17 @@ public class HomeController : Controller
             var searchRequest = youtubeService.Search.List("snippet");
             searchRequest.Q = word;
             searchRequest.Type = "video";
-            searchRequest.MaxResults = 50; // API kotasını aşmadan maksimum havuz
+            searchRequest.MaxResults = 50; 
 
-            // YENİ: SIRALAMA MANTIĞI
+            // SIRALAMA MANTIĞI
             searchRequest.Order = sortBy switch
             {
-                "date" => SearchResource.ListRequest.OrderEnum.Date, // En Yeni
-                "viewCount" => SearchResource.ListRequest.OrderEnum.ViewCount, // En Çok İzlenen
-                _ => SearchResource.ListRequest.OrderEnum.Relevance // Alaka Düzeyi (Varsayılan)
+                "date" => SearchResource.ListRequest.OrderEnum.Date, 
+                "viewCount" => SearchResource.ListRequest.OrderEnum.ViewCount, 
+                _ => SearchResource.ListRequest.OrderEnum.Relevance 
             };
 
-            // YENİ EKLENEN FİLTRE MANTIKLARI
+            // FİLTRE MANTIKLARI
             if (dateFilter != "all")
             {
                 searchRequest.PublishedAfterDateTimeOffset = dateFilter switch
@@ -142,16 +147,21 @@ public class HomeController : Controller
             videoRequest.Id = string.Join(",", videoIds);
             var videoResponse = await videoRequest.ExecuteAsync();
 
-            // İŞTE SİHİRLİ KISIM: HARİÇ TUTULAN KATEGORİLERİ ELEME
+            // İŞTE SİHİRLİ KISIM: KATEGORİ FİLTRELEME
             var filteredItems = videoResponse.Items.AsEnumerable();
 
+            // YENİ: DAHİL EDİLEN KATEGORİLER (Sadece bunları bırak)
+            if (includedCategories != null && includedCategories.Any())
+            {
+                filteredItems = filteredItems.Where(item => includedCategories.Contains(item.Snippet.CategoryId));
+            }
+
+            // HARİÇ TUTULAN KATEGORİLER (Bunları sil)
             if (excludedCategories != null && excludedCategories.Any())
             {
-                // Videonun kategori ID'si, kullanıcının elediği listede YOKSA onu alıyoruz.
                 filteredItems = filteredItems.Where(item => !excludedCategories.Contains(item.Snippet.CategoryId));
             }
 
-            // Eleme yapıldıktan sonra kalanlardan en tepeki 20 tanesini alıp dönüştürüyoruz
             var videoList = filteredItems.Take(20).Select(item => new YoutubeVideo
             {
                 Title = item.Snippet.Title,
@@ -161,7 +171,7 @@ public class HomeController : Controller
                 ViewCount = item.Statistics.ViewCount,
                 LikeCount = item.Statistics.LikeCount,
                 PublishedAt = item.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? "",
-                CategoryName = GetCategoryName(item.Snippet.CategoryId) // YENİ: Kategori ismini modele aktarıyoruz
+                CategoryName = GetCategoryName(item.Snippet.CategoryId) 
             }).ToList();
 
             allVideos.AddRange(videoList);
@@ -186,10 +196,8 @@ public class HomeController : Controller
             await _context.SaveChangesAsync();
         }
 
-        // Çoklu kelime arandığında bile ekrana basılacak maksimum video sayısını 50 ile sınırladık (Take 50)
         var distinctVideos = allVideos.GroupBy(v => v.VideoUrl).Select(g => g.First()).Take(50).ToList();
 
-        // Trendlerde sadece "filtresiz" aramaları VE SADECE BUGÜN arananları gösteriyoruz
         var today = DateTime.Today; 
         
         ViewBag.TopTrends = _context.SearchCaches
@@ -234,7 +242,7 @@ public class HomeController : Controller
         }
     }
 
-    // --- YENİ ARAÇ: SEO VE ETİKET ANALİZİ ---
+    // --- ARAÇ: SEO VE ETİKET ANALİZİ ---
     [Route("taganalyzer")]
     public IActionResult TagAnalyzer()
     {
@@ -253,7 +261,6 @@ public class HomeController : Controller
             return View(model);
         }
 
-        // URL'den 11 haneli Video ID'yi çıkaran Regex formülü
         var match = Regex.Match(videoUrl, @"(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^""&?\/\s]{11})");
         
         if (!match.Success)
@@ -264,7 +271,6 @@ public class HomeController : Controller
 
         var videoId = match.Groups[1].Value;
 
-        // API'ye bağlan ve video detaylarını çek
         var apiKey = _config["YouTubeSettings:ApiKey"];
         var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
 
@@ -280,12 +286,10 @@ public class HomeController : Controller
             return View(model);
         }
 
-        // Gelen verileri modele aktar
         model.VideoTitle = videoItem.Snippet.Title;
         model.ChannelName = videoItem.Snippet.ChannelTitle;
         model.ThumbnailUrl = videoItem.Snippet.Thumbnails.High?.Url ?? videoItem.Snippet.Thumbnails.Default__.Url;
         
-        // Videonun etiketleri varsa listeye at, yoksa boş liste döndür
         if (videoItem.Snippet.Tags != null)
         {
             model.Tags = videoItem.Snippet.Tags.ToList();
@@ -294,7 +298,7 @@ public class HomeController : Controller
         return View(model);
     }
 
-    // --- YENİ ARAÇ: DETAYLI KANAL ANALİZİ ---
+    // --- ARAÇ: DETAYLI KANAL ANALİZİ ---
     [Route("channelanalyzer")]
     public IActionResult ChannelAnalyzer()
     {
@@ -313,20 +317,19 @@ public class HomeController : Controller
             return View(model);
         }
 
-        // Kanal ID'sini linkten ayıklama (Basit yöntem)
         string channelId = "";
         if (channelUrl.Contains("channel/")) 
             channelId = channelUrl.Split("channel/")[1].Split('/')[0].Split('?')[0];
-        else if (channelUrl.Contains("@")) // Handle handles
-             channelId = channelUrl; // Handle'lar için özel arama gerekecek, şimdilik direkt ID kabul edelim
+        else if (channelUrl.Contains("@")) 
+             channelId = channelUrl; 
         else 
             channelId = channelUrl;
 
         var apiKey = _config["YouTubeSettings:ApiKey"];
         var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
 
-        // 1. Kanal Bilgilerini Çek
-        var channelRequest = youtubeService.Channels.List("snippet,statistics,brandingSettings");
+        // DÜZELTİLDİ: topicDetails eklendi
+        var channelRequest = youtubeService.Channels.List("snippet,statistics,brandingSettings,topicDetails");
         
         if (channelId.StartsWith("@")) channelRequest.ForHandle = channelId;
         else channelRequest.Id = channelId;
@@ -350,7 +353,17 @@ public class HomeController : Controller
         model.ViewCount = channelItem.Statistics.ViewCount;
         model.PublishedAt = channelItem.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy") ?? "";
 
-        // 2. Kanalın En Popüler 5 Videosunu Çek
+        // --- DÜZELTİLDİ: KANAL KATEGORİSİNİ AYIKLAMA ---
+        model.ChannelCategory = "Belirtilmemiş"; 
+        if (channelItem.TopicDetails?.TopicCategories != null)
+        {
+            var topics = channelItem.TopicDetails.TopicCategories
+                .Select(url => url.Split('/').Last().Replace("_", " "))
+                .ToList();
+                
+            model.ChannelCategory = string.Join(", ", topics);
+        }
+
         var searchRequest = youtubeService.Search.List("snippet");
         searchRequest.ChannelId = channelItem.Id;
         searchRequest.Order = SearchResource.ListRequest.OrderEnum.ViewCount;
@@ -367,7 +380,7 @@ public class HomeController : Controller
         return View(model);
     }
 
-    // --- YENİ ARAÇ: YORUM VE KİTLE ANALİZİ ---
+    // --- ARAÇ: YORUM VE KİTLE ANALİZİ ---
     [Route("commentanalyzer")]
     public IActionResult CommentAnalyzer()
     {
@@ -399,7 +412,6 @@ public class HomeController : Controller
 
         try
         {
-            // 1. Önce Video Detaylarını Çek
             var videoRequest = youtubeService.Videos.List("snippet,statistics");
             videoRequest.Id = videoId;
             var videoResponse = await videoRequest.ExecuteAsync();
@@ -416,11 +428,10 @@ public class HomeController : Controller
             model.ThumbnailUrl = videoItem.Snippet.Thumbnails.High?.Url ?? "";
             model.TotalCommentCount = videoItem.Statistics.CommentCount;
 
-            // 2. Videonun En Alakalı 50 Yorumunu Çek
             var commentRequest = youtubeService.CommentThreads.List("snippet");
             commentRequest.VideoId = videoId;
             commentRequest.MaxResults = 50; 
-            commentRequest.Order = CommentThreadsResource.ListRequest.OrderEnum.Relevance; // En çok beğeni alanları/alakalıları getir
+            commentRequest.Order = CommentThreadsResource.ListRequest.OrderEnum.Relevance; 
             
             var commentResponse = await commentRequest.ExecuteAsync();
 
@@ -428,7 +439,7 @@ public class HomeController : Controller
             {
                 AuthorName = c.Snippet.TopLevelComment.Snippet.AuthorDisplayName,
                 AuthorProfileImageUrl = c.Snippet.TopLevelComment.Snippet.AuthorProfileImageUrl,
-                TextOriginal = c.Snippet.TopLevelComment.Snippet.TextOriginal, // Yorumun saf metni
+                TextOriginal = c.Snippet.TopLevelComment.Snippet.TextOriginal, 
                 LikeCount = c.Snippet.TopLevelComment.Snippet.LikeCount,
                 PublishedAt = c.Snippet.TopLevelComment.Snippet.PublishedAtDateTimeOffset?.ToString("dd.MM.yyyy HH:mm") ?? ""
             }).ToList();
@@ -447,13 +458,11 @@ public class HomeController : Controller
 
     [HttpGet]
     [Route("commenthunter")]
-    // GET: Yorum Avcısı Sayfası
     public IActionResult CommentHunter()
     {
         return View();
     }
 
-// POST: Yorumlarda Arama Yapma
     [HttpPost]
     [Route("commenthunter")]
     public async Task<IActionResult> CommentHunter(string mainKeywords, string commentKeywords, string dateFilter, string durationFilter, bool hdOnly)
@@ -486,7 +495,6 @@ public class HomeController : Controller
         searchRequest.MaxResults = 25; 
         searchRequest.Type = "video";
 
-        // --- EKLENEN GELİŞMİŞ FİLTRELER BURADA BAŞLIYOR ---
         if (hdOnly)
         {
             searchRequest.VideoDefinition = SearchResource.ListRequest.VideoDefinitionEnum.High;
@@ -516,11 +524,9 @@ public class HomeController : Controller
 
             if (publishedAfter.HasValue)
             {
-                // Eski olan PublishedAfter yerine yeni olanı kullanıyoruz
                 searchRequest.PublishedAfterDateTimeOffset = publishedAfter; 
             }
         }
-        // --------------------------------------------------
 
         var searchResponse = await searchRequest.ExecuteAsync();
         var results = new List<CommentHunterResult>();
@@ -560,7 +566,7 @@ public class HomeController : Controller
                     {
                         VideoId = item.Id.VideoId,
                         Title = item.Snippet.Title,
-                        ChannelName = item.Snippet.ChannelTitle, // Kanal adını buradan alıyoruz
+                        ChannelName = item.Snippet.ChannelTitle, 
                         Thumbnail = item.Snippet.Thumbnails.Medium.Url,
                         CommentCount = matchCount,
                         SampleComment = firstMatchedComment
@@ -606,7 +612,6 @@ public class HomeController : Controller
             worksheet.Cell(1, 5).Value = "Eşleşen Yorum Sayısı";
             worksheet.Cell(1, 6).Value = "Örnek Yorum";
 
-            // Başlık satırını kalın yapalım
             worksheet.Row(1).Style.Font.Bold = true;
 
             for (int i = 0; i < results.Count; i++)

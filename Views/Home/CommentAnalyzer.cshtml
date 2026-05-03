@@ -1,77 +1,83 @@
 @model YTReklamAraci.Models.CommentAnalyzerViewModel
-
 @{
     ViewData["Title"] = "Comment Analyzer";
 }
 
-<div class="container mt-5">
-    <div class="text-center mb-5">
-        <h1 class="display-5"><i class="bi bi-chat-square-text text-danger"></i> Yorum & Kitle Analizi</h1>
-        <p class="lead">Videonun kitlesinin ne konuştuğunu ve tepkilerini anında görün.</p>
-    </div>
-
-    <div class="row justify-content-center mb-4">
-        <div class="col-md-8">
-            <form asp-action="CommentAnalyzer" method="post" class="input-group shadow-sm mb-2">
-                <input type="text" name="videoUrl" class="form-control form-control-lg" 
-                       placeholder="YouTube Video Linkini Yapıştırın..." 
-                       value="@Model.VideoUrl">
-                <button class="btn btn-danger btn-lg" type="submit">Yorumları Getir</button>
-            </form>
-            
-            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
-            {
-                <div class="alert alert-warning mt-3 text-center">@Model.ErrorMessage</div>
-            }
-        </div>
-    </div>
-
-    @if (!string.IsNullOrEmpty(Model.VideoTitle))
-    {
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card shadow-sm flex-md-row align-items-center p-3">
-                    <img src="@Model.ThumbnailUrl" style="width: 200px; border-radius: 8px;" class="me-3 mb-3 mb-md-0" alt="Thumbnail">
-                    <div>
-                        <h5 class="fw-bold mb-1">@Model.VideoTitle</h5>
-                        <p class="text-muted mb-2"><i class="bi bi-person-video"></i> @Model.ChannelName</p>
-                        <span class="badge bg-primary fs-6">
-                            <i class="bi bi-chat-dots"></i> Toplam Yorum: @Model.TotalCommentCount?.ToString("N0")
-                        </span>
-                    </div>
+<!-- Main Search Card -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+    <div class="card-body p-4">
+        <form asp-action="CommentAnalyzer" method="post">
+            <div class="row g-2 align-items-stretch" style="min-height: 52px;">
+                <!-- Video URL Input -->
+                <div class="col-lg-9 col-md-12">
+                    <input type="text" asp-for="VideoUrl" class="form-control form-control-lg border-0 shadow-sm h-100" style="border-radius: 10px; background-color: #f8f9fa; font-size: 1rem;" placeholder="YouTube Video URL'si yapıştırın..." required>
+                </div>
+                <!-- Submit Button -->
+                <div class="col-lg-3 col-md-12 mt-2 mt-lg-0">
+                    <button type="submit" class="btn w-100 shadow-sm border-0 d-flex justify-content-center align-items-center gap-2 h-100 fw-bold" style="border-radius: 10px; background: linear-gradient(135deg, #f2994a, #f2c94c); color: white; font-size: 1rem;">
+                        <i class="bi bi-chat-left-text-fill"></i> Yorumları Çek
+                    </button>
                 </div>
             </div>
-        </div>
+        </form>
 
-        @if (Model.Comments.Any())
+        <!-- Error Message -->
+        @if (!string.IsNullOrEmpty(Model?.ErrorMessage))
         {
-            <div class="row">
-                <div class="col-12 mb-3">
-                    <h5 class="text-muted border-bottom pb-2">En Popüler @Model.Comments.Count Yorum</h5>
-                </div>
-                @foreach (var comment in Model.Comments)
+            <div class="alert alert-danger mt-3 mb-0 border-0 shadow-sm" style="border-radius: 10px;">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> @Model.ErrorMessage
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Results Section -->
+@if (!string.IsNullOrEmpty(Model?.VideoTitle))
+{
+    <!-- Video Info Card -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+        <div class="card-body p-4 d-flex flex-column flex-md-row align-items-center gap-4">
+            <img src="@Model.ThumbnailUrl" class="rounded shadow-sm" style="width: 160px; object-fit: cover;" alt="Thumbnail">
+            <div>
+                <h5 class="fw-bold mb-2 text-dark">@Model.VideoTitle</h5>
+                <p class="text-muted small mb-2"><i class="bi bi-person-video me-1"></i> @Model.ChannelName</p>
+                <span class="badge bg-light text-dark border shadow-sm">
+                    <i class="bi bi-chat-dots text-primary me-1"></i> Toplam Yorum: @Model.TotalCommentCount?.ToString("N0")
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comments List Card -->
+    <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">En Alakalı 50 Yorum</h5>
+            
+            <div class="row g-4">
+                @if (Model.Comments != null && Model.Comments.Any())
                 {
-                    <div class="col-md-6 mb-3">
-                        <div class="card shadow-sm h-100 border-0">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div class="d-flex align-items-center">
-                                        <img src="@comment.AuthorProfileImageUrl" class="rounded-circle me-2" style="width: 35px; height: 35px;">
-                                        <span class="fw-bold small">@comment.AuthorName</span>
+                    @foreach (var comment in Model.Comments)
+                    {
+                        <!-- Single Comment Item -->
+                        <div class="col-12">
+                            <div class="d-flex gap-3 bg-light p-3 rounded shadow-sm border-0">
+                                <img src="@comment.AuthorProfileImageUrl" class="rounded-circle shadow-sm" style="width: 45px; height: 45px;" alt="Author">
+                                <div class="w-100">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <h6 class="fw-bold m-0 text-dark" style="font-size: 0.95rem;">@comment.AuthorName</h6>
+                                        <small class="text-muted" style="font-size: 0.8rem;">@comment.PublishedAt</small>
                                     </div>
-                                    <span class="badge bg-light text-dark border">
-                                        <i class="bi bi-hand-thumbs-up text-primary"></i> @comment.LikeCount?.ToString("N0")
-                                    </span>
-                                </div>
-                                <p class="card-text small text-muted mb-2" style="white-space: pre-wrap;">@comment.TextOriginal</p>
-                                <div class="text-end text-black-50" style="font-size: 0.75rem;">
-                                    @comment.PublishedAt
+                                    <p class="text-muted mb-2 small" style="white-space: pre-line;">@comment.TextOriginal</p>
+                                    <div class="d-flex align-items-center gap-1 text-muted small">
+                                        <i class="bi bi-hand-thumbs-up-fill text-secondary"></i> 
+                                        <span class="fw-semibold">@comment.LikeCount?.ToString("N0")</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    }
                 }
             </div>
-        }
-    }
-</div>
+        </div>
+    </div>
+}
