@@ -736,9 +736,10 @@ public class HomeController : Controller
                     videoDict.Remove(item.Id); 
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                ViewBag.Error = "API ile iletişimde bir hata oluştu.";
+                // Hatanın tam İngilizce teknik sebebini ekrana basarız
+                ViewBag.Error = $"API Hatası: {ex.Message}";
                 return View(results);
             }
         }
