@@ -634,4 +634,162 @@ public class HomeController : Controller
             }
         }
     }
+
+    // --- YENİ ARAÇ: BULK TITLE EXTRACTOR (TOPLU BAŞLIK ÇEKİCİ) ---
+    [HttpGet]
+    [Route("bulktitle")]
+    public IActionResult BulkTitleExtractor()
+    {
+        return View(new List<YoutubeVideo>()); // Model değiştirildi
+    }
+
+    [HttpPost]
+    [Route("bulktitle")]
+    public async Task<IActionResult> BulkTitleExtractor(string urls)
+    {
+        var results = new List<YoutubeVideo>(); // Model değiştirildi
+
+        if (string.IsNullOrWhiteSpace(urls))
+        {
+            ViewBag.Error = "Lütfen en az bir URL girin.";
+            return View(results);
+        }
+
+        var urlList = urls.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                          .Select(u => u.Trim())
+                          .Distinct()
+                          .ToList();
+
+        // --- YENİ EKLENEN: 2.500 LİMİT KONTROLÜ ---
+        if (urlList.Count > 2500)
+        {
+            ViewBag.Error = $"Maksimum 2.500 URL girebilirsiniz. Sistemde birbirini tekrar etmeyen {urlList.Count} adet link tespit edildi. Lütfen listenizi küçültün.";
+            return View(new List<YoutubeVideo>());
+        }
+        // ------------------------------------------
+
+        var videoDict = new Dictionary<string, string>(); 
+        
+        foreach (var url in urlList)
+        {
+            string videoId = null;
+
+            // 1. İHTİMAL: Kullanıcı link yerine direkt 11 haneli "Video ID" yapıştırmış olabilir
+            if (url.Length == 11 && Regex.IsMatch(url, @"^[a-zA-Z0-9_-]{11}$"))
+            {
+                videoId = url;
+            }
+            // 2. İHTİMAL: Normal Link, Shorts, Embed, /video/ veya mobil linki (youtu.be)
+            else
+            {
+                var match = Regex.Match(url, @"(?:v=|v\/|vi=|vi\/|youtu\.be\/|embed\/|shorts\/|video\/)([a-zA-Z0-9_-]{11})");
+                if (match.Success)
+                {
+                    videoId = match.Groups[1].Value;
+                }
+            }
+
+            // EĞER ID BULUNDUYSA SİSTEME DAHİL ET, BULUNAMADIYSA "GEÇERSİZ" İŞARETLE
+            if (!string.IsNullOrEmpty(videoId))
+            {
+                if (!videoDict.ContainsKey(videoId))
+                {
+                    videoDict.Add(videoId, url);
+                }
+            }
+            else
+            {
+                results.Add(new YoutubeVideo { OriginalUrl = url, Status = "Geçersiz Format" });
+            }
+        }
+
+        var videoIds = videoDict.Keys.ToList();
+        var apiKey = _config["YouTubeSettings:ApiKey"];
+        var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
+
+        int chunkSize = 50;
+        for (int i = 0; i < videoIds.Count; i += chunkSize)
+        {
+            var chunk = videoIds.Skip(i).Take(chunkSize).ToList();
+            
+            var videoRequest = youtubeService.Videos.List("snippet,statistics");
+            videoRequest.Id = string.Join(",", chunk);
+            
+            try
+            {
+                var videoResponse = await videoRequest.ExecuteAsync();
+
+                foreach (var item in videoResponse.Items)
+                {
+                    results.Add(new YoutubeVideo
+                    {
+                        VideoId = item.Id,
+                        OriginalUrl = videoDict[item.Id],
+                        Title = item.Snippet.Title,
+                        ChannelTitle = item.Snippet.ChannelTitle, // Kanal adı modelimize uygun atandı
+                        ViewCount = item.Statistics?.ViewCount,
+                        // YENİ EKLENEN KISIM: Kategori ismini çekiyoruz
+                        CategoryName = GetCategoryName(item.Snippet.CategoryId), 
+                        Status = "Bulundu"
+                    });
+                    
+                    videoDict.Remove(item.Id); 
+                }
+            }
+            catch (Exception)
+            {
+                ViewBag.Error = "API ile iletişimde bir hata oluştu.";
+                return View(results);
+            }
+        }
+
+        foreach (var kvp in videoDict)
+        {
+            results.Add(new YoutubeVideo { VideoId = kvp.Key, OriginalUrl = kvp.Value, Status = "Gizli veya Silinmiş" });
+        }
+
+        return View(results);
+    }
+
+    [HttpPost]
+    public IActionResult ExportBulkTitleToExcel(List<YoutubeVideo> results)
+    {
+        // YENİ EKLENEN GÜVENLİK YASTIĞI: Veri boş gelirse çökme, uyarı ver.
+        if (results == null || !results.Any())
+        {
+            return BadRequest("Veriler sunucuya ulaşamadı. Sistem güvenlik limitlerine takılmış olabilirsiniz. Lütfen Program.cs limit ayarlarınızı kontrol edin.");
+        }
+
+        using (var workbook = new ClosedXML.Excel.XLWorkbook())
+        {
+            var worksheet = workbook.Worksheets.Add("Toplu URL Analizi");
+            worksheet.Cell(1, 1).Value = "Durum";
+            worksheet.Cell(1, 2).Value = "Video Başlığı";
+            worksheet.Cell(1, 3).Value = "Orijinal URL";
+            worksheet.Cell(1, 4).Value = "Kanal Adı"; 
+            worksheet.Cell(1, 5).Value = "Kategori";
+            worksheet.Cell(1, 6).Value = "İzlenme Sayısı";
+
+            worksheet.Row(1).Style.Font.Bold = true;
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                worksheet.Cell(i + 2, 1).Value = results[i].Status ?? "-";
+                worksheet.Cell(i + 2, 2).Value = results[i].Title ?? "-";
+                worksheet.Cell(i + 2, 3).Value = results[i].OriginalUrl ?? "-";
+                worksheet.Cell(i + 2, 4).Value = results[i].ChannelTitle ?? "-"; 
+                worksheet.Cell(i + 2, 5).Value = results[i].CategoryName ?? "-";
+                worksheet.Cell(i + 2, 6).Value = results[i].ViewCount?.ToString() ?? "0";
+            }
+
+            worksheet.Columns().AdjustToContents(); 
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                var content = stream.ToArray();
+                return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Bulk_URL_Analysis.xlsx");
+            }
+        }
+    }
 }
