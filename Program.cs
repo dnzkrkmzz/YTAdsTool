@@ -28,9 +28,6 @@ var app = builder.Build();
 
 // --- MIDDLEWARE VE ROUTİNG AYARLARI ---
 
-// Uygulamanın /yt altında çalışacağını belirtir
-app.UsePathBase("/yt");
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");

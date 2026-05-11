@@ -13,4 +13,5 @@ public class YoutubeVideo
     public string OriginalUrl { get; set; } = string.Empty;
     public string VideoId { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+    public bool HasProfanity { get; set; } = false;
 }

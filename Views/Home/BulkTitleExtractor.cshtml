@@ -54,6 +54,7 @@
                         <input type="hidden" name="results[@i].CategoryName" value="@Model[i].CategoryName" />
                         <input type="hidden" name="results[@i].ViewCount" value="@Model[i].ViewCount" />
                         <input type="hidden" name="results[@i].Status" value="@Model[i].Status" />
+                        <input type="hidden" name="results[@i].HasProfanity" value="@Model[i].HasProfanity.ToString().ToLower()" />
                     }
                     <button type="submit" class="btn btn-success shadow-sm d-flex align-items-center gap-2">
                         <i class="bi bi-file-earmark-excel"></i> Excel İndir
@@ -82,8 +83,20 @@
                                     else { <i class="bi bi-x-circle-fill text-danger fs-5" title="@item.Status"></i> }
                                 </td>
                                 <td>
-                                    @if(item.Status == "Bulundu") { <small class="fw-semibold text-dark">@item.Title</small> }
-                                    else { <small class="text-danger fst-italic">@item.Status</small> }
+                                    @if(item.Status == "Bulundu") 
+                                    { 
+                                        <small class="fw-semibold text-dark">@item.Title</small> 
+                                        if(item.HasProfanity)
+                                        {
+                                            <span class="badge bg-danger text-white ms-2 shadow-sm" title="Başlık veya açıklamada uygunsuz kelime tespit edildi!">
+                                                <i class="bi bi-exclamation-triangle-fill"></i> Riskli İçerik
+                                            </span>
+                                        }
+                                    }
+                                    else 
+                                    { 
+                                        <small class="text-danger fst-italic">@item.Status</small> 
+                                    }
                                 </td>
                                 <td><small class="text-muted">@(item.ChannelTitle ?? "-")</small></td>
                                 

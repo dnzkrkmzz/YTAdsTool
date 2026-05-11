@@ -647,7 +647,7 @@ public class HomeController : Controller
     [Route("bulktitle")]
     public async Task<IActionResult> BulkTitleExtractor(string urls)
     {
-        var results = new List<YoutubeVideo>(); // Model değiştirildi
+        var results = new List<YoutubeVideo>(); 
 
         if (string.IsNullOrWhiteSpace(urls))
         {
@@ -660,13 +660,12 @@ public class HomeController : Controller
                           .Distinct()
                           .ToList();
 
-        // --- YENİ EKLENEN: 2.500 LİMİT KONTROLÜ ---
+        // --- 2.500 LİMİT KONTROLÜ ---
         if (urlList.Count > 2500)
         {
             ViewBag.Error = $"Maksimum 2.500 URL girebilirsiniz. Sistemde birbirini tekrar etmeyen {urlList.Count} adet link tespit edildi. Lütfen listenizi küçültün.";
             return View(new List<YoutubeVideo>());
         }
-        // ------------------------------------------
 
         var videoDict = new Dictionary<string, string>(); 
         
@@ -689,7 +688,6 @@ public class HomeController : Controller
                 }
             }
 
-            // EĞER ID BULUNDUYSA SİSTEME DAHİL ET, BULUNAMADIYSA "GEÇERSİZ" İŞARETLE
             if (!string.IsNullOrEmpty(videoId))
             {
                 if (!videoDict.ContainsKey(videoId))
@@ -707,6 +705,9 @@ public class HomeController : Controller
         var apiKey = _config["YouTubeSettings:ApiKey"];
         var youtubeService = new YouTubeService(new BaseClientService.Initializer() { ApiKey = apiKey });
 
+        // --- YENİ EKLENEN: MARKA GÜVENLİĞİ (KÜFÜR/ARGO) LİSTESİ ---
+        var badWords = new List<string> { "küfür1", "küfür2", "argo", "aptal", "salak", "gerizekalı" };
+
         int chunkSize = 50;
         for (int i = 0; i < videoIds.Count; i += chunkSize)
         {
@@ -721,15 +722,19 @@ public class HomeController : Controller
 
                 foreach (var item in videoResponse.Items)
                 {
+                    // MARKA GÜVENLİĞİ KONTROLÜ (Başlık ve açıklamayı tarar)
+                    string fullText = (item.Snippet.Title + " " + item.Snippet.Description).ToLower();
+                    bool isBad = badWords.Any(word => fullText.Contains(word));
+
                     results.Add(new YoutubeVideo
                     {
                         VideoId = item.Id,
                         OriginalUrl = videoDict[item.Id],
                         Title = item.Snippet.Title,
-                        ChannelTitle = item.Snippet.ChannelTitle, // Kanal adı modelimize uygun atandı
+                        ChannelTitle = item.Snippet.ChannelTitle, 
                         ViewCount = item.Statistics?.ViewCount,
-                        // YENİ EKLENEN KISIM: Kategori ismini çekiyoruz
                         CategoryName = GetCategoryName(item.Snippet.CategoryId), 
+                        HasProfanity = isBad, // Filtre sonucu modele aktarılıyor
                         Status = "Bulundu"
                     });
                     
